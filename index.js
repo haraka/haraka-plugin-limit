@@ -61,47 +61,48 @@ exports.shutdown = function () {
 
 exports.max_unrecognized_commands = function(next, connection, cmd) {
     var plugin = this;
-    if (!plugin.cfg.unrecognized_commands) { return next(); }
+    if (!plugin.cfg.unrecognized_commands) return next();
 
-    connection.results.add(plugin, {fail: 'unrecognized: ' + cmd, emit: true});
-    connection.results.incr(plugin, {unrec_cmds: 1});
+    connection.results.push(plugin, {unrec_cmds: cmd, emit: true});
 
     var max = parseFloat(plugin.cfg.unrecognized_commands.max);
-    if (!max || isNaN(max)) { return next(); }
+    if (!max || isNaN(max)) return next();
 
-    var uc = connection.results.get(plugin.name);
-    if (parseFloat(uc.unrec_cmds) <= max) { return next(); }
+    var uc = connection.results.get(plugin).unrec_cmds;
+    if (!uc || !uc.length) return next();
+
+    if (uc.length <= max) return next();
 
     connection.results.add(plugin, {fail: 'unrec_cmds.max'});
-    return next(constants.DENYDISCONNECT, 'Too many unrecognized commands');
+    plugin.penalize(connection, true, 'Too many unrecognized commands', next);
 };
 
 exports.max_errors = function (next, connection) {
     var plugin = this;
-    if (!plugin.cfg.errors) { return next(); } // disabled in config
+    if (!plugin.cfg.errors) return next();  // disabled in config
 
     var max = parseFloat(plugin.cfg.errors.max);
-    if (!max || isNaN(max)) { return next(); }
+    if (!max || isNaN(max)) return next();
 
-    if (connection.errors <= max) { return next(); }
+    if (connection.errors <= max) return next();
 
     connection.results.add(plugin, {fail: 'errors.max'});
-    return next(constants.DENYSOFTDISCONNECT, 'Too many errors');
+    plugin.penalize(connection, true, 'Too many errors', next);
 };
 
 exports.max_recipients = function (next, connection, params) {
     var plugin = this;
-    if (!plugin.cfg.recipients) { return next(); } // disabled in config
+    if (!plugin.cfg.recipients) return next(); // disabled in config
 
     var max = plugin.get_recipient_limit(connection);
-    if (!max) { return next(); }
+    if (!max || isNaN(max)) return next();
 
     var c = connection.rcpt_count;
     var count = c.accept + c.tempfail + c.reject + 1;
-    if (count <= max) { return next(); }
+    if (count <= max) return next();
 
-    connection.results.add(plugin, {fail: 'recipients.max'});
-    return next(constants.DENYSOFT, 'Too many recipients');
+    connection.results.add(plugin, { fail: 'recipients.max' });
+    plugin.penalize(connection, false, 'Too many recipient attempts', next);
 };
 
 exports.get_recipient_limit = function (connection) {
@@ -140,31 +141,32 @@ exports.get_recipient_limit = function (connection) {
 
 exports.incr_concurrency = function (next, connection) {
     var plugin = this;
-    if (!plugin.cfg.concurrency) { return next(); }
+    if (!plugin.cfg.concurrency) return next();
 
     var dbkey = plugin.get_key(connection);
 
-    plugin.db.incr(dbkey, function (err, concurrent) {
-
-        if (concurrent === undefined) {
-            connection.results.add(plugin, {err: 'concurrency not returned by incr!'});
-            return next();
-        }
-        if (isNaN(concurrent)) {
-            connection.results.add(plugin, {err: 'concurrency isNaN!'});
+    plugin.db.incr(dbkey, function (err, count) {
+        if (err) {
+            connection.results.add(plugin, { err: 'incr_concurrency:' + err });
             return next();
         }
 
-        connection.logdebug(plugin, 'concurrency incremented to ' + concurrent);
+        if (isNaN(count)) {
+            connection.results.add(plugin, {err: 'incr_concurrency got isNaN'});
+            return next();
+        }
+
+        connection.results.add(plugin, { concurrent_count: count });
 
         // repair negative concurrency counters
-        if (concurrent < 1) {
-            connection.loginfo(plugin, 'resetting ' + concurrent + ' to 1');
+        if (count < 1) {
+            connection.results.add(plugin, {
+                msg: 'resetting concurrent ' + count + ' to 1'
+            });
             plugin.db.set(dbkey, 1);
         }
 
-        connection.notes.concurrent=concurrent;
-        plugin.db.expire(dbkey, 60);
+        plugin.db.expire(dbkey, 120); // 2 minute lifetime
         next();
     });
 };
@@ -178,35 +180,23 @@ exports.check_concurrency = function (next, connection) {
 
     var max = plugin.get_concurrency_limit(connection);
     if (!max || isNaN(max)) {
-        connection.logerror(plugin, "no limit?!");
-        return next();
-    }
-    connection.logdebug(plugin, 'concurrent max: ' + max);
-
-    var concurrent = parseInt(connection.notes.concurrent);
-    if (isNaN(concurrent)) {
-        connection.results.add(plugin, { err: 'concurrent unset' });
+        connection.results.add(plugin, {err: "concurrency: no limit?!"});
         return next();
     }
 
-    if (concurrent <= max) {
-        connection.results.add(plugin, { pass: concurrent + '/' + max});
+    var count = parseInt(connection.results.get(plugin.name).concurrent_count);
+    if (isNaN(count)) {
+        connection.results.add(plugin, { err: 'concurrent.unset' });
         return next();
     }
 
-    connection.results.add(plugin, {
-        fail: 'concurrency: ' + concurrent + '/' + max,
-    });
+    connection.results.add(plugin, { concurrent: count + '/' + max });
 
-    var delay = 3;
-    if (plugin.cfg.concurrency.disconnect_delay) {
-        delay = parseFloat(plugin.cfg.concurrency.disconnect_delay);
-    }
+    if (count <= max) return next();
 
-    // Disconnect slowly.
-    setTimeout(function () {
-        return next(constants.DENYSOFTDISCONNECT, 'Too many concurrent connections');
-    }, delay * 1000);
+    connection.results.add(plugin, { fail: 'concurrency.max' });
+
+    plugin.penalize(connection, true, 'Too many concurrent connections', next);
 };
 
 exports.get_concurrency_limit = function (connection) {
@@ -239,13 +229,30 @@ exports.get_concurrency_limit = function (connection) {
     return plugin.cfg.concurrency.history_none || 3;
 };
 
+exports.penalize = function (connection, disconnect, msg, next) {
+    var plugin = this;
+    var code = disconnect ? constants.DENYSOFTDISCONNECT : constants.DENYSOFT;
+
+    if (!plugin.cfg.main.tarpit_delay) {
+        return next(code, msg);
+    }
+
+    var delay = plugin.cfg.main.tarpit_delay;
+    connection.loginfo(plugin, 'tarpitting for ' + delay + 's');
+
+    setTimeout(function () {
+        if (!connection) return;
+        next(code, msg);
+    }, delay * 1000);
+}
+
 exports.decr_concurrency = function (next, connection) {
     var plugin = this;
-    if (!plugin.cfg.concurrency) { return next(); }
+    if (!plugin.cfg.concurrency) return next();
 
     var dbkey = plugin.get_key(connection);
     plugin.db.incrby(dbkey, -1, function (err, concurrent) {
-        connection.results.add(plugin, {msg: 'concurrency=' + concurrent});
+        if (err) connection.results.add(plugin, { err: 'decr_concurrency:' + err })
         return next();
     });
 };
@@ -299,16 +306,14 @@ exports.lookup_host_key = function (type, remote, cb) {
     return cb(null, ip, 0);
 };
 
-exports.lookup_mail_key = function (type, mail, cb) {
+exports.get_mail_key = function (type, mail, cb) {
     var plugin = this;
-    if (!plugin.cfg[type] || !mail) {
-        return cb();
-    }
+    if (!plugin.cfg[type] || !mail) return cb();
 
     // Full e-mail address (e.g. smf@fsl.com)
     var email = mail.address();
     if (plugin.cfg[type][email] || plugin.cfg[type][email] === 0) {
-        return cb(null, email, plugin.cfg[type][email]);
+        return cb(email, plugin.cfg[type][email]);
     }
 
     // RHS parts e.g. host.sub.sub.domain.com
@@ -317,7 +322,7 @@ exports.lookup_mail_key = function (type, mail, cb) {
         while (rhs_split.length) {
             var part = rhs_split.join('.');
             if (plugin.cfg[type][part] || plugin.cfg[type][part] === 0) {
-                return cb(null, part, plugin.cfg[type][part]);
+                return cb(part, plugin.cfg[type][part]);
             }
             rhs_split.pop();
         }
@@ -325,14 +330,21 @@ exports.lookup_mail_key = function (type, mail, cb) {
 
     // Custom Default
     if (plugin.cfg[type].default) {
-        return cb(null, email, plugin.cfg[type].default);
+        return cb(email, plugin.cfg[type].default);
     }
 
     // Default 0 = unlimited
-    return cb(null, email, 0);
+    return cb(email, 0);
 };
 
-function getTTL (qty, units) {
+function getTTL (value) {
+
+    var match = /^(\d+)(?:\/(\d+)(\S)?)?$/.exec(value);
+    if (!match) return;
+
+    var qty = match[2];
+    var units = match[3];
+
     var ttl = qty ? qty : 60;  // Default 60s
     if (!units) return ttl;
 
@@ -355,6 +367,12 @@ function getTTL (qty, units) {
     return ttl;
 }
 
+function getLimit (value) {
+    var match = /^([\d]+)/.exec(value);
+    if (!match) return;
+    return match[1];
+}
+
 exports.rate_limit = function (connection, key, value, cb) {
     var plugin = this;
 
@@ -366,44 +384,20 @@ exports.rate_limit = function (connection, key, value, cb) {
     // CAUTION: !value would match that 0 value -^
     if (!key || !value) return cb();
 
-    var match = /^(\d+)(?:\/(\d+)(\S)?)?$/.exec(value);
-    if (!match) {
-        return cb(new Error('syntax error: key=' + key + ' value=' + value));
-    }
+    var limit = getLimit(value);
+    var ttl = getTTL(value);
 
-    var limit = match[1];
-    var ttl = getTTL(match[2], match[3]);
-    if (!ttl) {
-        return cb(new Error('unknown time unit \'' + match[3] + '\' key=' + key));
+    if (!limit || ! ttl) {
+        return cb(new Error('syntax error: key=' + key + ' value=' + value));
     }
 
     connection.logdebug(plugin, 'key=' + key + ' limit=' + limit + ' ttl=' + ttl);
 
-    plugin.db.get(key, function (err, val) {
+    plugin.db.incr(key, function (err, newval) {
         if (err) return cb(err);
 
-        if (val == null) {      // new key
-            plugin.db.setex(key, ttl, 1);
-            return cb(null, false);
-        }
-
-        connection.logdebug(plugin, 'key=' + key + ' current value=' + (val || 'NEW' ));
-
-        plugin.db.incr(key, function (err2, newval) {
-            if (err2) return cb(err2);
-
-            var key_str = key + ':' + newval;
-            var limit_str = limit + '/' + ttl + 's';
-
-            if (parseInt(newval) > parseInt(limit)) {
-                // Limit exceeded
-                connection.results.add(plugin, { fail: key_str + ' > ' + limit_str, emit: true } );
-                return cb(null, true);
-            }
-
-            connection.results.add(plugin, { pass: key_str + ' < ' + limit_str, emit: true });
-            cb(null, false);
-        });
+        if (newval === 1) plugin.db.expire(key, ttl);
+        cb(err, parseInt(newval) > parseInt(limit)); // boolean true/false
     });
 };
 
@@ -414,7 +408,7 @@ exports.rate_rcpt_host = function (next, connection) {
 
     plugin.lookup_host_key('rate_rcpt_host', connection.remote, function (err, key, value) {
         if (err) {
-            connection.results.add(plugin, { err: err });
+            connection.results.add(plugin, { err: 'rate_rcpt_host:' + err });
             return next();
         }
 
@@ -426,19 +420,18 @@ exports.rate_rcpt_host = function (next, connection) {
 
         plugin.db.get('rate_rcpt_host:' + key, function (err2, result) {
             if (err2) {
-                connection.results.add(plugin, { err: err2 });
+                connection.results.add(plugin, { err: 'rate_rcpt_host:' + err2 });
                 return next();
             }
 
             if (!result) return next();
-            if (result <= limit) return next();
+            connection.results.add(plugin, {
+                rate_rcpt_host: key + ':' + result + '/' + limit
+            });
 
-            connection.results.add(plugin, {fail: 'rate_rcpt_host:' + key + ':' + result });
-            if (!plugin.cfg.main.tarpit_delay) {
-                return next(constants.DENYSOFT, 'connection rate limit exceeded');
-            }
-            connection.notes.tarpit = plugin.cfg.main.tarpit_delay;
-            next();
+            if (result <= limit) return next();
+            connection.results.add(plugin, { fail: 'rate_rcpt_host' });
+            plugin.penalize(connection, false, 'connection rate limit exceeded', next);
         });
     });
 }
@@ -448,24 +441,35 @@ exports.rate_conn = function (next, connection) {
 
     plugin.lookup_host_key('rate_conn', connection.remote, function (err, key, value) {
         if (err) {
-            connection.results.add(plugin, { err: err });
+            connection.results.add(plugin, { err: 'rate_conn:' + err });
             return next();
         }
 
-        plugin.rate_limit(connection, 'rate_conn:' + key, value, function (err2, over) {
+        if (value === 0) return next(); // limits disabled for host
+        if (!key || !value) return next();
+
+        var limit = getLimit(value);
+        var ttl = getTTL(value);
+        if (!limit || ! ttl) {
+            connection.results.add(plugin, { err: 'rate_conn:syntax:' + value });
+            return next();
+        }
+
+        plugin.db.incr('rate_conn:' + key, function (err2, newval) {
             if (err2) {
-                connection.results.add(plugin, { err: err2 });
+                connection.results.add(plugin, { err: 'rate_conn:' + err });
                 return next();
             }
-            connection.results.add(plugin, { rate_conn: value });
-            if (!over) return next();
 
-            if (!plugin.cfg.main.tarpit_delay) {
-                connection.results.add(plugin, { fail: 'rate_conn' });
-                return next(constants.DENYSOFT, 'connection rate limit exceeded');
-            }
-            connection.notes.tarpit = plugin.cfg.main.tarpit_delay;
-            next();
+            if (newval === 1) plugin.db.expire('rate_conn:' + key, ttl);
+
+            connection.results.add(plugin, { rate_conn: newval + '/' + limit});
+
+            if (parseInt(newval) <= parseInt(limit)) return next();
+
+            connection.results.add(plugin, { fail: 'rate_conn' });
+
+            plugin.penalize(connection, true, 'connection rate limit exceeded', next);
         });
     });
 };
@@ -473,34 +477,20 @@ exports.rate_conn = function (next, connection) {
 exports.rate_rcpt_sender = function (next, connection, params) {
     var plugin = this;
 
-    plugin.lookup_mail_key('rate_rcpt_sender', connection.transaction.mail_from, function (err, key, value) {
-        if (err) {
-            connection.results.add(plugin, { err: err });
-            return next();
-        }
+    plugin.get_mail_key('rate_rcpt_sender', connection.transaction.mail_from, function (key, value) {
 
-        plugin.rate_limit(connection, 'rate_rcpt_sender' + ':' + key, value, function (err2, over) {
-            if (err2) {
-                connection.results.add(plugin, { err: err2 });
-                return next();
-            }
-            if (!over) {
-                connection.results.add(plugin, { pass: 'rate_rcpt_sender:' + value });
+        plugin.rate_limit(connection, 'rate_rcpt_sender' + ':' + key, value, function (err, over) {
+            if (err) {
+                connection.results.add(plugin, { err: 'rate_rcpt_sender:' + err });
                 return next();
             }
 
-            connection.results.add(plugin, { fail: 'rate_rcpt_sender:' + value });
-            if (!plugin.cfg.main.tarpit_delay) {  // tarpitting disabled
-                return next(constants.DENYSOFT, 'rate limit exceeded');
-            }
+            connection.results.add(plugin, { rate_rcpt_sender: value });
 
-            var delay = plugin.cfg.main.tarpit_delay;
-            connection.loginfo(plugin, 'tarpitting for ' + delay + 's');
-            setTimeout(function () {
-                if (connection) {
-                    return next(constants.DENYSOFT, 'rate limit exceeded');
-                }
-            }, delay * 1000);
+            if (!over) return next();
+
+            connection.results.add(plugin, { fail: 'rate_rcpt_sender' });
+            plugin.penalize(connection, false, 'rcpt rate limit exceeded', next);
         });
     });
 };
@@ -508,72 +498,45 @@ exports.rate_rcpt_sender = function (next, connection, params) {
 exports.rate_rcpt_null = function (next, connection, params) {
     var plugin = this;
 
+    if (Array.isArray(params)) params = params[0];
     if (params.user) return next();
 
     // Message from the null sender
-    plugin.lookup_mail_key('rate_rcpt_null', params[0], function (err, key, value) {
-        if (err) {
-            connection.results.add(plugin, { err: err });
-            return next();
-        }
+    plugin.get_mail_key('rate_rcpt_null', params, function (key, value) {
 
         plugin.rate_limit(connection, 'rate_rcpt_null' + ':' + key, value, function (err2, over) {
             if (err2) {
-                connection.results.add(plugin, { err: err2 });
-                return next();
-            }
-            if (!over) {
-                connection.results.add(plugin, { pass: 'rate_rcpt_null:' + value });
+                connection.results.add(plugin, { err: 'rate_rcpt_null:' + err2 });
                 return next();
             }
 
-            connection.results.add(plugin, { fail: 'rate_rcpt_null:' + value });
-            if (!plugin.cfg.main.tarpit_delay) {             // tarpitting disabled
-                return next(constants.DENYSOFT, 'rate limit exceeded');
-            }
+            connection.results.add(plugin, { rate_rcpt_null: value });
 
-            var delay = plugin.cfg.main.tarpit_delay;
-            connection.loginfo(plugin, 'tarpitting for ' + delay + 's');
-            setTimeout(function () {
-                if (connection) {
-                    return next(constants.DENYSOFT, 'rate limit exceeded');
-                }
-            }, delay * 1000);
+            if (!over) return next();
+
+            connection.results.add(plugin, { fail: 'rate_rcpt_null' });
+            plugin.penalize(connection, false, 'null recip rate limit', next);
         });
     });
 };
 
 exports.rate_rcpt = function (next, connection, params) {
     var plugin = this;
-
-    plugin.lookup_mail_key('rate_rcpt', params[0], function (err, key, value) {
-        if (err) {
-            connection.results.add(plugin, { err: err });
-            return next();
-        }
+    if (Array.isArray(params)) params = params[0];
+    plugin.get_mail_key('rate_rcpt', params, function (key, value) {
 
         plugin.rate_limit(connection, 'rate_rcpt' + ':' + key, value, function (err2, over) {
             if (err2) {
-                connection.results.add(plugin, { err: err2 });
-                return next();
-            }
-            if (!over) {
-                connection.results.add(plugin, { pass: 'rate_rcpt:' + value });
+                connection.results.add(plugin, { err: 'rate_rcpt:' + err2 });
                 return next();
             }
 
-            connection.results.add(plugin, { fail: 'rate_rcpt:' + value });
-            if (!plugin.cfg.main.tarpit_delay) {             // tarpitting disabled
-                return next(constants.DENYSOFT, 'rate limit exceeded');
-            }
+            connection.results.add(plugin, { rate_rcpt: value });
 
-            var delay = plugin.cfg.main.tarpit_delay;
-            connection.loginfo(plugin, 'tarpitting for ' + delay + 's');
-            setTimeout(function () {
-                if (connection) {
-                    return next(constants.DENYSOFT, 'rate limit exceeded');
-                }
-            }, delay * 1000);
+            if (!over) return next();
+
+            connection.results.add(plugin, { fail: 'rate_rcpt' });
+            plugin.penalize(connection, false, 'rate limit exceeded', next);
         });
     });
 };

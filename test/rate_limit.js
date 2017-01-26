@@ -1,6 +1,7 @@
 'use strict';
 
 var Address      = require('address-rfc2821').Address;
+var constants    = require('haraka-constants');
 var fixtures     = require('haraka-test-fixtures');
 
 var _set_up = function (done) {
@@ -74,7 +75,7 @@ exports.lookup_host_key = {
     },
 }
 
-exports.lookup_mail_key = {
+exports.get_mail_key = {
     setUp : function (done) {
         this.plugin = new fixtures.plugin('rate_limit');
         this.connection = new fixtures.connection.createConnection();
@@ -82,30 +83,27 @@ exports.lookup_mail_key = {
         done();
     },
     'rate_rcpt_sender' : function (test) {
-        test.expect(3);
-        this.plugin.lookup_mail_key('rate_rcpt_sender', new Address('<user@example.com>'), function (err, addr, limit) {
+        test.expect(2);
+        this.plugin.get_mail_key('rate_rcpt_sender', new Address('<user@example.com>'), function (addr, limit) {
             // console.log(arguments);
-            test.equal(err, undefined);
             test.equal(addr, 'user@example.com');
             test.equal(limit, '50/5m');
             test.done();
         });
     },
     'rate_rcpt_null' : function (test) {
-        test.expect(3);
-        this.plugin.lookup_mail_key('rate_rcpt_null', new Address('<postmaster>'), function (err, addr, limit) {
+        test.expect(2);
+        this.plugin.get_mail_key('rate_rcpt_null', new Address('<postmaster>'), function (addr, limit) {
             // console.log(arguments);
-            test.equal(err, undefined);
             test.equal(addr, 'postmaster');
             test.equal(limit, '1');
             test.done();
         });
     },
     'rate_rcpt' : function (test) {
-        test.expect(3);
-        this.plugin.lookup_mail_key('rate_rcpt', new Address('<user@example.com>'), function (err, addr, limit) {
+        test.expect(2);
+        this.plugin.get_mail_key('rate_rcpt', new Address('<user@example.com>'), function (addr, limit) {
             // console.log(arguments);
-            test.equal(err, undefined);
             test.equal(addr, 'user@example.com');
             test.equal(limit, '50/5m');
             test.done();
@@ -127,7 +125,7 @@ exports.rate_limit = {
     'no limit' : function (test) {
         test.expect(2);
         this.plugin.rate_limit(this.connection, 'key', 0, function (err, is_limited) {
-            console.log(arguments);
+            // console.log(arguments);
             test.equal(err, undefined);
             test.equal(is_limited, false);
             test.done();
@@ -136,10 +134,47 @@ exports.rate_limit = {
     'below 50/5m limit' : function (test) {
         test.expect(2);
         this.plugin.rate_limit(this.connection, 'key', '50/5m', function (err, is_limited) {
-            console.log(arguments);
+            // console.log(arguments);
             test.equal(err, undefined);
             test.equal(is_limited, false);
             test.done();
         })
     }
+}
+
+exports.rate_conn = {
+    setUp : function (done) {
+        this.plugin = new fixtures.plugin('rate_limit');
+        this.connection = new fixtures.connection.createConnection();
+        this.connection.remote.ip = '1.2.3.4';
+        this.connection.remote.host = 'mail.example.com';
+
+        this.plugin.register();
+        var server = { notes: {} };
+        this.plugin.init_redis_plugin(function () {
+            done();
+        },
+        server);
+    },
+    'default limit' : function (test) {
+        test.expect(3);
+        this.plugin.rate_conn(function (code, msg) {
+
+            var rc = this.connection.results.get(this.plugin.name);
+            test.ok(rc.rate_conn);
+
+            var match = /([\d]+)\/([\d]+)$/.exec(rc.rate_conn);  // 1/5
+
+            if (parseInt(match[1]) <= parseInt(match[2])) {
+                test.equal(code, undefined);
+                test.equal(msg, undefined);
+            }
+            else {
+                test.equal(code, constants.DENYSOFTDISCONNECT);
+                test.equal(msg, 'connection rate limit exceeded');
+            }
+            test.done();
+        }.bind(this),
+        this.connection);
+    },
 }

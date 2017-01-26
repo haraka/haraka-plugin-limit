@@ -88,7 +88,7 @@ exports.max_recipients = {
         var cb = function (rc, msg) {
             // console.log(arguments);
             test.equal(rc, constants.DENYSOFT);
-            test.equal(msg, 'Too many recipients');
+            test.equal(msg, 'Too many recipient attempts');
             test.done();
         };
         this.connection.rcpt_count = { accept: 3, tempfail: 5, reject: 4 };
@@ -115,55 +115,57 @@ exports.max_unrecognized_commands = {
         test.expect(2);
         var cb = function (rc, msg) {
             // console.log(arguments);
-            test.equal(rc, constants.DENYDISCONNECT);
+            test.equal(rc, constants.DENYSOFTDISCONNECT);
             test.equal(msg, 'Too many unrecognized commands');
             test.done();
         };
         this.plugin.cfg.unrecognized_commands = { max: 5 };
-        this.connection.results.incr(this.plugin, {'unrec_cmds': 6});
+        this.connection.results.push(this.plugin, {
+            'unrec_cmds': ['1','2','3','4',5,6]
+        });
         this.plugin.max_unrecognized_commands(cb, this.connection);
     },
 };
 
-// exports.check_concurrency = {
-//     setUp : _set_up,
-//     'none': function (test) {
-//         test.expect(2);
-//         var cb = function (rc, msg) {
-//             // console.log(arguments);
-//             test.equal(rc, null);
-//             test.equal(msg, null);
-//             test.done();
-//         };
-//         this.plugin.check_concurrency(cb, this.connection);
-//     },
-//     'at max': function (test) {
-//         test.expect(2);
-//         var cb = function (rc, msg) {
-//             // console.log(arguments);
-//             test.equal(rc, null);
-//             test.equal(msg, null);
-//             test.done();
-//         };
-//         var self = this;
-//         self.plugin.cfg.concurrency.history = undefined;
-//         self.plugin.cfg.concurrency = { max: 4 };
-//         self.connection.notes.limit=4;
-//         self.plugin.check_concurrency(cb, self.connection);
-//     },
-//     'too many': function (test) {
-//         test.expect(2);
-//         var cb = function (rc, msg) {
-//             // console.log(arguments);
-//             test.equal(rc, constants.DENYSOFTDISCONNECT);
-//             test.equal(msg, 'Too many concurrent connections');
-//             test.done();
-//         };
-//         var self = this;
-//         self.plugin.cfg.concurrency.history = undefined;
-//         self.plugin.cfg.concurrency = { max: 4 };
-//         self.plugin.cfg.concurrency.disconnect_delay=1;
-//         self.connection.notes.limit=5;
-//         self.plugin.check_concurrency(cb, self.connection);
-//     },
-// };
+exports.check_concurrency = {
+    setUp : _set_up,
+    'none': function (test) {
+        test.expect(2);
+        var cb = function (rc, msg) {
+            // console.log(arguments);
+            test.equal(rc, null);
+            test.equal(msg, null);
+            test.done();
+        };
+        this.plugin.check_concurrency(cb, this.connection);
+    },
+    'at max': function (test) {
+        test.expect(2);
+        var cb = function (rc, msg) {
+            // console.log(arguments);
+            test.equal(rc, null);
+            test.equal(msg, null);
+            test.done();
+        };
+        var self = this;
+        self.plugin.cfg.concurrency.history = undefined;
+        self.plugin.cfg.concurrency = { max: 4 };
+        self.connection.results.add(self.plugin, { concurrent_count: 4 });
+        self.plugin.check_concurrency(cb, self.connection);
+    },
+    'too many': function (test) {
+        test.expect(2);
+        var cb = function (rc, msg) {
+            // console.log(arguments);
+            test.equal(rc, constants.DENYSOFTDISCONNECT);
+            test.equal(msg, 'Too many concurrent connections');
+            test.done();
+        };
+        var self = this;
+        self.plugin.cfg.concurrency.history = undefined;
+        self.plugin.cfg.concurrency = { max: 4 };
+        self.plugin.cfg.concurrency.disconnect_delay=1;
+        self.connection.results.add(self.plugin, { concurrent_count: 5 });
+        self.plugin.check_concurrency(cb, self.connection);
+    },
+};
