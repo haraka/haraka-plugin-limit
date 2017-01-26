@@ -1,0 +1,39 @@
+{
+  "name": "haraka-plugin-limit",
+  "version": "1.0.0",
+  "description": "enforce various types of limits on remote MTAs",
+  "main": "limit.js",
+  "directories": {
+    "test": "test"
+  },
+  "dependencies": {
+    "haraka-constants": "^1.0.2",
+    "haraka-plugin-redis": "*",
+    "redis": "^2.6.5"
+  },
+  "devDependencies": {
+    "eslint": "^3.14.1",
+    "haraka-test-fixtures": "^1.0.13",
+    "nodeunit": "^0.10.2"
+  },
+  "scripts": {
+    "lint": "./node_modules/.bin/eslint *.js test/*.js",
+    "test": "./run_tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/haraka/haraka-plugin-limit.git"
+  },
+  "keywords": [
+    "haraka",
+    "smtp",
+    "mta",
+    "limit"
+  ],
+  "author": "Matt Simerson <matt@tnpi.net>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/haraka/haraka-plugin-limit/issues"
+  },
+  "homepage": "https://github.com/haraka/haraka-plugin-limit#readme"
+}
