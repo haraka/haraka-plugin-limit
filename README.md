@@ -1,12 +1,33 @@
 # limit
 
-Apply several types of limits to SMTP connections.
+Apply many types of limits to SMTP connections.
 
-Each limit type has a max value that can be defined in limit.ini. The default is empty / disabled until a value has been set.
+Each limit type has values that can be defined in limit.ini. The default is empty / disabled until a value has been set.
 
-## See Also
 
-To set rate limits on connections and recipients, see the `rate_limit` plugin.
+### [main]
+
+- tarpit_delay = seconds *(optional)*
+
+Set this to the length in seconds that you want to delay every SMTP
+response to a remote client that has exceeded the rate limits.  For this
+to work the 'tarpit' plugin must be loaded **after** this plugin in
+config/plugins.
+
+If 'tarpit' is not loaded or is loaded before this plugin, then no
+rate throttling will occur.
+
+
+## [redis]
+
+Redis is the cluster-safe storage backend for maintaining the counters necessary to impose limits reliably.
+
+- host (default: 127.0.0.1)
+- port (default: 6379)
+- db   (default: 0)
+
+If this section or any values are missing, the defaults from redis.ini are used.
+
 
 ## concurrency
 
@@ -54,23 +75,129 @@ When `[errors]max` is set, a connection that exceeeds the limit is disconnected.
 * attempting MAIL on port 465/587 without AUTH
 * MAIL or RCPT addresses that fail to parse
 
+
+
+# Rate Limits
+
+By default DENYSOFT will be returned when rate limits are exceeded. You can
+instead tarpit the connection, adding a delay before every response. This
+requires the 'tarpit' plugin to run immediately after this plugin.
+
+Missing sections disables that particular test.
+
+They all use a common configuration format:
+
+- \<lookup\> = \<limit\>[/time[unit]]  *(optional)*
+
+   'lookup' is based upon the limit being enforced and is either an IP
+   address, rDNS name, sender address or recipient address either in full
+   or part.
+   The lookup order is as follows and the first match in this order is
+   returned and is used as the record key in Redis (except for 'default'
+   which always uses the full lookup for that test as the record key):
+
+   **IPv4/IPv6 address or rDNS hostname:**
+
+   <pre>
+   fe80:0:0:0:202:b3ff:fe1e:8329
+   fe80:0:0:0:202:b3ff:fe1e
+   fe80:0:0:0:202:b3ff
+   fe80:0:0:0:202
+   fe80:0:0:0
+   fe80:0:0
+   fe80:0
+   fe80
+   1.2.3.4
+   1.2.3
+   1.2
+   1
+   host.part.domain.com
+   part.domain.com
+   domain.com
+   com
+   default
+   </pre>
+
+   **Sender or Recipient address:**
+
+   <pre>
+   user@host.sub.part.domain.com
+   host.sub.part.domain.com
+   sub.part.domain.com
+   part.domain.com
+   domain.com
+   com
+   default
+   </pre>
+
+   In all tests 'default' is used to specify a default limit if nothing else has
+   matched.
+
+   'limit' specifies the limit for this lookup.  Specify 0 (zero) to disable
+   limits on a matching lookup.
+
+   'time' is optional and if missing defaults to 60 seconds.  You can optionally
+   specify the following time units (case-insensitive):
+
+   - s (seconds)
+   - m (minutes)
+   - h (hours)
+   - d (days)
+
+
+### [rate_conn]
+
+This section limits the number of connections per interval from a given host
+or set of hosts.
+
+IP and rDNS names are looked up by this test.
+
+
+### [rate_rcpt_host]
+
+This section limits the number of recipients per interval from a given host or
+set of hosts.
+
+IP and rDNS names are looked up by this test.
+
+
+### [rate_rcpt_sender]
+
+This section limits the number of recipients per interval from a sender or
+sender domain.
+
+The sender is looked up by this test.
+
+
+### [rate_rcpt]
+
+This section limits the rate which a recipient or recipient domain can
+receive messages over an interval.
+
+Each recipient is looked up by this test.
+
+
+### [rate_rcpt_null]
+
+This section limits the rate at which a recipient can receive messages from
+a null sender (e.g. DSN, MDN etc.) over an interval.
+
+Each recipient is looked up by this test.
+
+
+
+
 # Error Handling
 
 ## Too high counters
 
-If the NoSQL store is Redis and Haraka is restarted or crashes while active
-connections are open, the concurrency counters might be inflated. This is
-handled by the [concurrency]reset setting (default: 10m), which:
-
-* ssc: sets collection expiration time
-* redis: empties the concurrency hash
-* RAM: empties the in-memory hash of all keys
+If Haraka is restarted or crashes while active connections are open, the
+concurrency counters might be inflated.
 
 ## Too low counters
 
-Because the redis and RAM objects are emptied periodically, connections that
-are open while the collections are emptied will be too low. When
-that happens, log messages like these might be emitted:
+Connections that are open while the collections are emptied will be too low.
+When that happens, log messages like these might be emitted:
 
     resetting 0 to 1
     resetting -1 to 1

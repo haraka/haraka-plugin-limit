@@ -1,6 +1,7 @@
 'use strict';
 
 var constants = require('haraka-constants');
+var ipaddr    = require('ipaddr.js');
 
 exports.register = function () {
     var plugin = this;
@@ -44,6 +45,10 @@ exports.load_limit_ini = function () {
 
     plugin.merge_redis_ini();
 };
+
+exports.shutdown = function () {
+    if (this.db) this.db.quit();
+}
 
 exports.max_unrecognized_commands = function(next, connection, cmd) {
     var plugin = this;
@@ -238,4 +243,314 @@ exports.decr_concurrency = function (next, connection) {
 
         return next();
     });
+};
+
+
+
+exports.lookup_host_key = function (type, remote, cb) {
+    var plugin = this;
+    if (!plugin.cfg[type]) {
+        return cb(new Error(type + ': not configured'));
+    }
+
+    try {
+        var ip = ipaddr.parse(remote.ip);
+        if (ip.kind === 'ipv6') {
+            ip = ipaddr.toNormalizedString();
+        }
+        else {
+            ip = ip.toString();
+        }
+    }
+    catch (err) {
+        return cb(err);
+    }
+
+    var ip_array = ((ip.kind === 'ipv6') ? ip.split(':') : ip.split('.'));
+    while (ip_array.length) {
+        var part = ((ip.kind === 'ipv6') ? ip_array.join(':') : ip_array.join('.'));
+        if (plugin.cfg[type][part] || plugin.cfg[type][part] === 0) {
+            return cb(null, part, plugin.cfg[type][part]);
+        }
+        ip_array.pop();
+    }
+
+    // rDNS
+    if (remote.host) {
+        var rdns_array = remote.host.toLowerCase().split('.');
+        while (rdns_array.length) {
+            var part2 = rdns_array.join('.');
+            if (plugin.cfg[type][part2] || plugin.cfg[type][part2] === 0) {
+                return cb(null, part2, plugin.cfg[type][part2]);
+            }
+            rdns_array.pop();
+        }
+    }
+
+    // Custom Default
+    if (plugin.cfg[type].default) {
+        return cb(null, ip, plugin.cfg[type].default);
+    }
+
+    // Default 0 = unlimited
+    return cb(null, ip, 0);
+};
+
+exports.lookup_mail_key = function (type, args, cb) {
+    var plugin = this;
+    var mail = args[0];
+    if (!plugin.cfg[type] || !mail) {
+        return cb();
+    }
+
+    // Full e-mail address (e.g. smf@fsl.com)
+    var email = mail.address();
+    if (plugin.cfg[type][email] || plugin.cfg[type][email] === 0) {
+        return cb(null, email, plugin.cfg[type][email]);
+    }
+
+    // RHS parts e.g. host.sub.sub.domain.com
+    if (mail.host) {
+        var rhs_split = mail.host.toLowerCase().split('.');
+        while (rhs_split.length) {
+            var part = rhs_split.join('.');
+            if (plugin.cfg[type][part] || plugin.cfg[type][part] === 0) {
+                return cb(null, part, plugin.cfg[type][part]);
+            }
+            rhs_split.pop();
+        }
+    }
+
+    // Custom Default
+    if (plugin.cfg[type].default) {
+        return cb(null, email, plugin.cfg[type].default);
+    }
+    // Default 0 = unlimited
+    return cb(null, email, 0);
+};
+
+exports.rate_limit = function (connection, key, value, cb) {
+    var plugin = this;
+
+    if (value === 0) {     // Limit disabled for this host
+        connection.loginfo(this, 'rate limit disabled for: ' + key);
+        return cb(null, false);
+    }
+
+    // CAUTION: !value would match a valid 0 value
+    if (!key || !value) return cb();
+
+    var match = /^(\d+)(?:\/(\d+)(\S)?)?$/.exec(value);
+    if (match) {
+        var limit = match[1];
+        var ttl = ((match[2]) ? match[2] : 60);  // Default 60s
+        if (match[3]) {
+            // Unit
+            switch (match[3].toLowerCase()) {
+                case 's':
+                    // Default is seconds
+                    break;
+                case 'm':
+                    ttl *= 60;
+                    break;
+                case 'h':
+                    ttl *= (60*60);
+                    break;
+                case 'd':
+                    ttl *= (60*60*24);
+                    break;
+                default:
+                    // Unknown time unit
+                    return cb(new Error('unknown time unit \'' + match[3] + '\' key=' + key));
+            }
+        }
+    }
+    else {
+        // Syntax error
+        return cb(new Error('syntax error: key=' + key + ' value=' + value));
+    }
+
+    connection.logdebug(plugin, 'key=' + key + ' limit=' + limit + ' ttl=' + ttl);
+
+    plugin.db.get(key, function (err, val) {
+        if (err) return cb(err);
+
+        connection.logdebug(plugin, 'key=' + key + ' current value=' + (val || 'NEW' ));
+
+        var check_limits = function (err2, result){
+            if (err2) return cb(err2);
+
+            var key_str = key + ':' + val;
+            var limit_str = limit + '/' + ttl + 's';
+
+            if (parseInt(val) + 1 > parseInt(limit)) {
+                // Limit breached
+                connection.results.add(plugin, { fail: key_str + ' > ' + limit_str, emit: true } );
+                return cb(null, true);
+            }
+            else {
+                // OK
+                connection.results.add(plugin, { pass: key_str + ' < ' + limit_str, emit: true });
+                return cb(null, false);
+            }
+
+        };
+
+        if (val == null) { // new key
+            plugin.db.setex(key, ttl, 1, check_limits);
+        }
+        else { // old key
+            plugin.db.incr(key, function (err3, result) {
+                if (result === 1) {
+                    plugin.db.expire(key, ttl);
+                }
+                check_limits(err3, result);
+            });
+        }
+    });
+};
+
+exports.hook_connect = function (next, connection) {
+    var plugin = this;
+
+    this.lookup_host_key('rate_conn', connection.remote, function (err, key, value) {
+        if (err) {
+            connection.results.add(plugin, { err: err });
+            return next();
+        }
+        // Check rate limit
+        plugin.rate_limit(connection, 'rate_conn:' + key, value, function (err2, over) {
+            if (err2) {
+                connection.results.add(plugin, { err: err2 });
+                return next();
+            }
+            if (over) {
+                if (plugin.cfg.main.tarpit_delay) {
+                    connection.notes.tarpit = plugin.cfg.main.tarpit_delay;
+                }
+                else {
+                    connection.results.add(plugin, {fail: 'rate_conn:' + key + ' value ' + over });
+                    return next(constants.DENYSOFT, 'connection rate limit exceeded');
+                }
+            }
+
+            // See if we need to tarpit rate_rcpt_host
+            if (!plugin.cfg.main.tarpit_delay) {
+                return next();
+            }
+
+            plugin.lookup_host_key('rate_rcpt_host', connection.remote, function (err3, key2, value2) {
+                if (err3) {
+                    connection.results.add(plugin, { err: err3 });
+                    return next();
+                }
+                if (!key2 || !value2) {
+                    return next();
+                }
+
+                var match = /^(\d+)/.exec(value2);
+                var limit = match[0];
+                if (!limit) return next();
+
+                plugin.db.get('rate_rcpt_host:' + key2, function (err4, result) {
+                    if (err4) {
+                        connection.results.add(plugin, { err: err4 });
+                        return next();
+                    }
+
+                    if (!result) return next();
+
+                    connection.results.add(plugin, {fail: 'rate_rcpt_host:' + key2 + ' value2 ' + result });
+                    connection.logdebug(plugin, 'rate_rcpt_host:' + key2 + ' value2 ' + result + ' exceeds limit ' + limit);
+                    if (result > limit) {
+                        connection.notes.tarpit = plugin.cfg.main.tarpit_delay;
+                    }
+                    next();
+                });
+            });
+        });
+    });
+};
+
+exports.hook_rcpt = function (next, connection, params) {
+    var plugin = this;
+    var transaction = connection.transaction;
+
+    var chain = [
+        {
+            name:           'rate_rcpt_host',
+            lookup_func:    'lookup_host_key',
+            lookup_args:    connection.remote,
+        },
+        {
+            name:           'rate_rcpt_sender',
+            lookup_func:    'lookup_mail_key',
+            lookup_args:    [connection.transaction.mail_from],
+        },
+        {
+            name:           'rate_rcpt_null',
+            lookup_func:    'lookup_mail_key',
+            lookup_args:    [params[0]],
+            check_func:     function () {
+                if (transaction && !transaction.mail_from.user) {
+                    // Message from the null sender
+                    return true;
+                }
+                return false;
+            },
+        },
+        {
+            name:           'rate_rcpt',
+            lookup_func:    'lookup_mail_key',
+            lookup_args:    [params[0]],
+        },
+    ];
+
+    var chain_caller = function (code, msg) {
+        if (code)          return next(code, msg);
+        if (!chain.length) return next();
+
+        var next_in_chain = chain.shift();
+        // Run any check functions
+        if (next_in_chain.check_func && typeof next_in_chain.check_func === 'function') {
+            if (!next_in_chain.check_func()) {
+                return chain_caller();
+            }
+        }
+        plugin[next_in_chain.lookup_func](next_in_chain.name, next_in_chain.lookup_args, function (err, key, value) {
+            if (err) {
+                connection.results.add(plugin, { err: err });
+                return chain_caller();
+            }
+
+            plugin.rate_limit(connection, next_in_chain.name + ':' + key, value, function (err2, over) {
+                if (err2) {
+                    connection.results.add(plugin, { err: err2 });
+                    return chain_caller();
+                }
+                if (!over) {
+                    return chain_caller();
+                }
+
+                if (!plugin.cfg.main.tarpit_delay) {             // tarpitting disabled
+                    return chain_caller(constants.DENYSOFT, 'rate limit exceeded');
+                }
+
+                if (connection.notes.tarpit) {                   // already tarpitting
+                    return chain_caller(constants.DENYSOFT, 'rate limit exceeded');
+                }
+                if (transaction && transaction.notes.tarpit) {   // already tarpitting
+                    return chain_caller(constants.DENYSOFT, 'rate limit exceeded');
+                }
+
+                connection.loginfo(plugin, 'tarpitting response for ' + plugin.cfg.main.tarpit + 's');
+                setTimeout(function () {
+                    if (connection) {
+                        return chain_caller(constants.DENYSOFT, 'rate limit exceeded');
+                    }
+                }, plugin.cfg.main.tarpit_delay*1000);
+            });
+        });
+    };
+    chain_caller();
 };

@@ -9,9 +9,11 @@
   "dependencies": {
     "haraka-constants": "^1.0.2",
     "haraka-plugin-redis": "*",
+    "ipaddr.js": "^1.2.0",
     "redis": "^2.6.5"
   },
   "devDependencies": {
+    "address-rfc2821": "^1.0.1",
     "eslint": "^3.14.1",
     "haraka-test-fixtures": "^1.0.13",
     "nodeunit": "^0.10.2"
