@@ -83,7 +83,7 @@ exports.lookup_mail_key = {
     },
     'rate_rcpt_sender' : function (test) {
         test.expect(3);
-        this.plugin.lookup_mail_key('rate_rcpt_sender', [new Address('<user@example.com>')], function (err, addr, limit) {
+        this.plugin.lookup_mail_key('rate_rcpt_sender', new Address('<user@example.com>'), function (err, addr, limit) {
             // console.log(arguments);
             test.equal(err, undefined);
             test.equal(addr, 'user@example.com');
@@ -93,7 +93,7 @@ exports.lookup_mail_key = {
     },
     'rate_rcpt_null' : function (test) {
         test.expect(3);
-        this.plugin.lookup_mail_key('rate_rcpt_null', [new Address('<postmaster>')], function (err, addr, limit) {
+        this.plugin.lookup_mail_key('rate_rcpt_null', new Address('<postmaster>'), function (err, addr, limit) {
             // console.log(arguments);
             test.equal(err, undefined);
             test.equal(addr, 'postmaster');
@@ -103,7 +103,7 @@ exports.lookup_mail_key = {
     },
     'rate_rcpt' : function (test) {
         test.expect(3);
-        this.plugin.lookup_mail_key('rate_rcpt', [new Address('<user@example.com>')], function (err, addr, limit) {
+        this.plugin.lookup_mail_key('rate_rcpt', new Address('<user@example.com>'), function (err, addr, limit) {
             // console.log(arguments);
             test.equal(err, undefined);
             test.equal(addr, 'user@example.com');

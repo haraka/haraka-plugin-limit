@@ -31,6 +31,15 @@ exports.register = function () {
     if (plugin.cfg.unrecognized_commands) {
         plugin.register_hook('unrecognized_command', 'max_unrecognized_commands');
     }
+
+    plugin.register_hook('connect', 'rate_rcpt_host');
+    plugin.register_hook('connect', 'rate_conn');
+
+    ['rcpt', 'rcpt_ok'].forEach(function (h) {
+        plugin.register_hook(h,    'rate_rcpt_sender');
+        plugin.register_hook(h,    'rate_rcpt_null');
+        plugin.register_hook(h,    'rate_rcpt');
+    });
 };
 
 exports.load_limit_ini = function () {
@@ -135,14 +144,14 @@ exports.incr_concurrency = function (next, connection) {
 
     var dbkey = plugin.get_key(connection);
 
-    plugin.db.incrby(dbkey, 1, function (err, concurrent) {
+    plugin.db.incr(dbkey, function (err, concurrent) {
 
         if (concurrent === undefined) {
-            connection.logerror(plugin, 'concurrency not returned by incrby!');
+            connection.results.add(plugin, {err: 'concurrency not returned by incr!'});
             return next();
         }
         if (isNaN(concurrent)) {
-            connection.logerror(plugin, 'concurrency isNaN!');
+            connection.results.add(plugin, {err: 'concurrency isNaN!'});
             return next();
         }
 
@@ -154,7 +163,8 @@ exports.incr_concurrency = function (next, connection) {
             plugin.db.set(dbkey, 1);
         }
 
-        connection.notes.limit=concurrent;
+        connection.notes.concurrent=concurrent;
+        plugin.db.expire(dbkey, 60);
         next();
     });
 };
@@ -173,7 +183,11 @@ exports.check_concurrency = function (next, connection) {
     }
     connection.logdebug(plugin, 'concurrent max: ' + max);
 
-    var concurrent = parseInt(connection.notes.limit);
+    var concurrent = parseInt(connection.notes.concurrent);
+    if (isNaN(concurrent)) {
+        connection.results.add(plugin, { err: 'concurrent unset' });
+        return next();
+    }
 
     if (concurrent <= max) {
         connection.results.add(plugin, { pass: concurrent + '/' + max});
@@ -231,21 +245,10 @@ exports.decr_concurrency = function (next, connection) {
 
     var dbkey = plugin.get_key(connection);
     plugin.db.incrby(dbkey, -1, function (err, concurrent) {
-        connection.logdebug(plugin, 'decrement concurrency to ' + concurrent);
-
-        // if connections didn't increment properly (this happened a lot
-        // before we added the connect_init hook), the counter can go
-        // negative. check for and repair negative concurrency counters
-        if (concurrent < 0) {
-            connection.loginfo(plugin, 'resetting ' + concurrent + ' to 1');
-            plugin.db.set(dbkey, 1);
-        }
-
+        connection.results.add(plugin, {msg: 'concurrency=' + concurrent});
         return next();
     });
 };
-
-
 
 exports.lookup_host_key = function (type, remote, cb) {
     var plugin = this;
@@ -296,9 +299,8 @@ exports.lookup_host_key = function (type, remote, cb) {
     return cb(null, ip, 0);
 };
 
-exports.lookup_mail_key = function (type, args, cb) {
+exports.lookup_mail_key = function (type, mail, cb) {
     var plugin = this;
-    var mail = args[0];
     if (!plugin.cfg[type] || !mail) {
         return cb();
     }
@@ -325,9 +327,33 @@ exports.lookup_mail_key = function (type, args, cb) {
     if (plugin.cfg[type].default) {
         return cb(null, email, plugin.cfg[type].default);
     }
+
     // Default 0 = unlimited
     return cb(null, email, 0);
 };
+
+function getTTL (qty, units) {
+    var ttl = qty ? qty : 60;  // Default 60s
+    if (!units) return ttl;
+
+    // Unit
+    switch (units.toLowerCase()) {
+        case 's':               // Default is seconds
+            break;
+        case 'm':
+            ttl *= 60;          // minutes
+            break;
+        case 'h':
+            ttl *= (60*60);     // hours
+            break;
+        case 'd':
+            ttl *= (60*60*24);  // days
+            break;
+        default:
+            return;
+    }
+    return ttl;
+}
 
 exports.rate_limit = function (connection, key, value, cb) {
     var plugin = this;
@@ -337,37 +363,18 @@ exports.rate_limit = function (connection, key, value, cb) {
         return cb(null, false);
     }
 
-    // CAUTION: !value would match a valid 0 value
+    // CAUTION: !value would match that 0 value -^
     if (!key || !value) return cb();
 
     var match = /^(\d+)(?:\/(\d+)(\S)?)?$/.exec(value);
-    if (match) {
-        var limit = match[1];
-        var ttl = ((match[2]) ? match[2] : 60);  // Default 60s
-        if (match[3]) {
-            // Unit
-            switch (match[3].toLowerCase()) {
-                case 's':
-                    // Default is seconds
-                    break;
-                case 'm':
-                    ttl *= 60;
-                    break;
-                case 'h':
-                    ttl *= (60*60);
-                    break;
-                case 'd':
-                    ttl *= (60*60*24);
-                    break;
-                default:
-                    // Unknown time unit
-                    return cb(new Error('unknown time unit \'' + match[3] + '\' key=' + key));
-            }
-        }
-    }
-    else {
-        // Syntax error
+    if (!match) {
         return cb(new Error('syntax error: key=' + key + ' value=' + value));
+    }
+
+    var limit = match[1];
+    var ttl = getTTL(match[2], match[3]);
+    if (!ttl) {
+        return cb(new Error('unknown time unit \'' + match[3] + '\' key=' + key));
     }
 
     connection.logdebug(plugin, 'key=' + key + ' limit=' + limit + ' ttl=' + ttl);
@@ -375,182 +382,198 @@ exports.rate_limit = function (connection, key, value, cb) {
     plugin.db.get(key, function (err, val) {
         if (err) return cb(err);
 
+        if (val == null) {      // new key
+            plugin.db.setex(key, ttl, 1);
+            return cb(null, false);
+        }
+
         connection.logdebug(plugin, 'key=' + key + ' current value=' + (val || 'NEW' ));
 
-        var check_limits = function (err2, result){
+        plugin.db.incr(key, function (err2, newval) {
             if (err2) return cb(err2);
 
-            var key_str = key + ':' + val;
+            var key_str = key + ':' + newval;
             var limit_str = limit + '/' + ttl + 's';
 
-            if (parseInt(val) + 1 > parseInt(limit)) {
-                // Limit breached
+            if (parseInt(newval) > parseInt(limit)) {
+                // Limit exceeded
                 connection.results.add(plugin, { fail: key_str + ' > ' + limit_str, emit: true } );
                 return cb(null, true);
             }
-            else {
-                // OK
-                connection.results.add(plugin, { pass: key_str + ' < ' + limit_str, emit: true });
-                return cb(null, false);
-            }
 
-        };
-
-        if (val == null) { // new key
-            plugin.db.setex(key, ttl, 1, check_limits);
-        }
-        else { // old key
-            plugin.db.incr(key, function (err3, result) {
-                if (result === 1) {
-                    plugin.db.expire(key, ttl);
-                }
-                check_limits(err3, result);
-            });
-        }
+            connection.results.add(plugin, { pass: key_str + ' < ' + limit_str, emit: true });
+            cb(null, false);
+        });
     });
 };
 
-exports.hook_connect = function (next, connection) {
+exports.rate_rcpt_host = function (next, connection) {
     var plugin = this;
 
-    this.lookup_host_key('rate_conn', connection.remote, function (err, key, value) {
+    if (!plugin.cfg.rate_rcpt_host) return next();
+
+    plugin.lookup_host_key('rate_rcpt_host', connection.remote, function (err, key, value) {
         if (err) {
             connection.results.add(plugin, { err: err });
             return next();
         }
-        // Check rate limit
+
+        if (!key || !value) return next();
+
+        var match = /^(\d+)/.exec(value);
+        var limit = match[0];
+        if (!limit) return next();
+
+        plugin.db.get('rate_rcpt_host:' + key, function (err2, result) {
+            if (err2) {
+                connection.results.add(plugin, { err: err2 });
+                return next();
+            }
+
+            if (!result) return next();
+            if (result <= limit) return next();
+
+            connection.results.add(plugin, {fail: 'rate_rcpt_host:' + key + ':' + result });
+            if (!plugin.cfg.main.tarpit_delay) {
+                return next(constants.DENYSOFT, 'connection rate limit exceeded');
+            }
+            connection.notes.tarpit = plugin.cfg.main.tarpit_delay;
+            next();
+        });
+    });
+}
+
+exports.rate_conn = function (next, connection) {
+    var plugin = this;
+
+    plugin.lookup_host_key('rate_conn', connection.remote, function (err, key, value) {
+        if (err) {
+            connection.results.add(plugin, { err: err });
+            return next();
+        }
+
         plugin.rate_limit(connection, 'rate_conn:' + key, value, function (err2, over) {
             if (err2) {
                 connection.results.add(plugin, { err: err2 });
                 return next();
             }
-            if (over) {
-                if (plugin.cfg.main.tarpit_delay) {
-                    connection.notes.tarpit = plugin.cfg.main.tarpit_delay;
-                }
-                else {
-                    connection.results.add(plugin, {fail: 'rate_conn:' + key + ' value ' + over });
-                    return next(constants.DENYSOFT, 'connection rate limit exceeded');
-                }
-            }
+            connection.results.add(plugin, { rate_conn: value });
+            if (!over) return next();
 
-            // See if we need to tarpit rate_rcpt_host
             if (!plugin.cfg.main.tarpit_delay) {
-                return next();
+                connection.results.add(plugin, { fail: 'rate_conn' });
+                return next(constants.DENYSOFT, 'connection rate limit exceeded');
             }
-
-            plugin.lookup_host_key('rate_rcpt_host', connection.remote, function (err3, key2, value2) {
-                if (err3) {
-                    connection.results.add(plugin, { err: err3 });
-                    return next();
-                }
-                if (!key2 || !value2) {
-                    return next();
-                }
-
-                var match = /^(\d+)/.exec(value2);
-                var limit = match[0];
-                if (!limit) return next();
-
-                plugin.db.get('rate_rcpt_host:' + key2, function (err4, result) {
-                    if (err4) {
-                        connection.results.add(plugin, { err: err4 });
-                        return next();
-                    }
-
-                    if (!result) return next();
-
-                    connection.results.add(plugin, {fail: 'rate_rcpt_host:' + key2 + ' value2 ' + result });
-                    connection.logdebug(plugin, 'rate_rcpt_host:' + key2 + ' value2 ' + result + ' exceeds limit ' + limit);
-                    if (result > limit) {
-                        connection.notes.tarpit = plugin.cfg.main.tarpit_delay;
-                    }
-                    next();
-                });
-            });
+            connection.notes.tarpit = plugin.cfg.main.tarpit_delay;
+            next();
         });
     });
 };
 
-exports.hook_rcpt = function (next, connection, params) {
+exports.rate_rcpt_sender = function (next, connection, params) {
     var plugin = this;
-    var transaction = connection.transaction;
 
-    var chain = [
-        {
-            name:           'rate_rcpt_host',
-            lookup_func:    'lookup_host_key',
-            lookup_args:    connection.remote,
-        },
-        {
-            name:           'rate_rcpt_sender',
-            lookup_func:    'lookup_mail_key',
-            lookup_args:    [connection.transaction.mail_from],
-        },
-        {
-            name:           'rate_rcpt_null',
-            lookup_func:    'lookup_mail_key',
-            lookup_args:    [params[0]],
-            check_func:     function () {
-                if (transaction && !transaction.mail_from.user) {
-                    // Message from the null sender
-                    return true;
-                }
-                return false;
-            },
-        },
-        {
-            name:           'rate_rcpt',
-            lookup_func:    'lookup_mail_key',
-            lookup_args:    [params[0]],
-        },
-    ];
-
-    var chain_caller = function (code, msg) {
-        if (code)          return next(code, msg);
-        if (!chain.length) return next();
-
-        var next_in_chain = chain.shift();
-        // Run any check functions
-        if (next_in_chain.check_func && typeof next_in_chain.check_func === 'function') {
-            if (!next_in_chain.check_func()) {
-                return chain_caller();
-            }
+    plugin.lookup_mail_key('rate_rcpt_sender', connection.transaction.mail_from, function (err, key, value) {
+        if (err) {
+            connection.results.add(plugin, { err: err });
+            return next();
         }
-        plugin[next_in_chain.lookup_func](next_in_chain.name, next_in_chain.lookup_args, function (err, key, value) {
-            if (err) {
-                connection.results.add(plugin, { err: err });
-                return chain_caller();
+
+        plugin.rate_limit(connection, 'rate_rcpt_sender' + ':' + key, value, function (err2, over) {
+            if (err2) {
+                connection.results.add(plugin, { err: err2 });
+                return next();
+            }
+            if (!over) {
+                connection.results.add(plugin, { pass: 'rate_rcpt_sender:' + value });
+                return next();
             }
 
-            plugin.rate_limit(connection, next_in_chain.name + ':' + key, value, function (err2, over) {
-                if (err2) {
-                    connection.results.add(plugin, { err: err2 });
-                    return chain_caller();
-                }
-                if (!over) {
-                    return chain_caller();
-                }
+            connection.results.add(plugin, { fail: 'rate_rcpt_sender:' + value });
+            if (!plugin.cfg.main.tarpit_delay) {  // tarpitting disabled
+                return next(constants.DENYSOFT, 'rate limit exceeded');
+            }
 
-                if (!plugin.cfg.main.tarpit_delay) {             // tarpitting disabled
-                    return chain_caller(constants.DENYSOFT, 'rate limit exceeded');
+            var delay = plugin.cfg.main.tarpit_delay;
+            connection.loginfo(plugin, 'tarpitting for ' + delay + 's');
+            setTimeout(function () {
+                if (connection) {
+                    return next(constants.DENYSOFT, 'rate limit exceeded');
                 }
-
-                if (connection.notes.tarpit) {                   // already tarpitting
-                    return chain_caller(constants.DENYSOFT, 'rate limit exceeded');
-                }
-                if (transaction && transaction.notes.tarpit) {   // already tarpitting
-                    return chain_caller(constants.DENYSOFT, 'rate limit exceeded');
-                }
-
-                connection.loginfo(plugin, 'tarpitting response for ' + plugin.cfg.main.tarpit + 's');
-                setTimeout(function () {
-                    if (connection) {
-                        return chain_caller(constants.DENYSOFT, 'rate limit exceeded');
-                    }
-                }, plugin.cfg.main.tarpit_delay*1000);
-            });
+            }, delay * 1000);
         });
-    };
-    chain_caller();
+    });
+};
+
+exports.rate_rcpt_null = function (next, connection, params) {
+    var plugin = this;
+
+    if (params.user) return next();
+
+    // Message from the null sender
+    plugin.lookup_mail_key('rate_rcpt_null', params[0], function (err, key, value) {
+        if (err) {
+            connection.results.add(plugin, { err: err });
+            return next();
+        }
+
+        plugin.rate_limit(connection, 'rate_rcpt_null' + ':' + key, value, function (err2, over) {
+            if (err2) {
+                connection.results.add(plugin, { err: err2 });
+                return next();
+            }
+            if (!over) {
+                connection.results.add(plugin, { pass: 'rate_rcpt_null:' + value });
+                return next();
+            }
+
+            connection.results.add(plugin, { fail: 'rate_rcpt_null:' + value });
+            if (!plugin.cfg.main.tarpit_delay) {             // tarpitting disabled
+                return next(constants.DENYSOFT, 'rate limit exceeded');
+            }
+
+            var delay = plugin.cfg.main.tarpit_delay;
+            connection.loginfo(plugin, 'tarpitting for ' + delay + 's');
+            setTimeout(function () {
+                if (connection) {
+                    return next(constants.DENYSOFT, 'rate limit exceeded');
+                }
+            }, delay * 1000);
+        });
+    });
+};
+
+exports.rate_rcpt = function (next, connection, params) {
+    var plugin = this;
+
+    plugin.lookup_mail_key('rate_rcpt', params[0], function (err, key, value) {
+        if (err) {
+            connection.results.add(plugin, { err: err });
+            return next();
+        }
+
+        plugin.rate_limit(connection, 'rate_rcpt' + ':' + key, value, function (err2, over) {
+            if (err2) {
+                connection.results.add(plugin, { err: err2 });
+                return next();
+            }
+            if (!over) {
+                connection.results.add(plugin, { pass: 'rate_rcpt:' + value });
+                return next();
+            }
+
+            connection.results.add(plugin, { fail: 'rate_rcpt:' + value });
+            if (!plugin.cfg.main.tarpit_delay) {             // tarpitting disabled
+                return next(constants.DENYSOFT, 'rate limit exceeded');
+            }
+
+            var delay = plugin.cfg.main.tarpit_delay;
+            connection.loginfo(plugin, 'tarpitting for ' + delay + 's');
+            setTimeout(function () {
+                if (connection) {
+                    return next(constants.DENYSOFT, 'rate limit exceeded');
+                }
+            }, delay * 1000);
+        });
+    });
 };
