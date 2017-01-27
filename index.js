@@ -40,11 +40,23 @@ exports.register = function () {
         plugin.register_hook(h,    'rate_rcpt_null');
         plugin.register_hook(h,    'rate_rcpt');
     });
+
+    if (plugin.cfg.outbound.enabled) {
+        plugin.register_hook('send_email', 'increment_outbound_limit');
+        plugin.register_hook('delivered',  'decrement_outbound_limit');
+        plugin.register_hook('deferred',   'decrement_outbound_limit');
+        plugin.register_hook('bounce',     'decrement_outbound_limit');
+    }
 };
 
 exports.load_limit_ini = function () {
     var plugin = this;
-    plugin.cfg = plugin.config.get('limit.ini', function () {
+    plugin.cfg = plugin.config.get('limit.ini', {
+        booleans: [
+            '-outbound.enabled'
+        ]
+    },
+    function () {
         plugin.load_limit_ini();
     });
 
@@ -540,3 +552,38 @@ exports.rate_rcpt = function (next, connection, params) {
         });
     });
 };
+
+/*
+ *        Outbound Rate Limits
+ *
+ */
+
+function getOutKey (hmail) {
+    return 'outbound-rate:' + hmail.domain;
+}
+
+exports.increment_outbound_limit = function (next, hmail) {
+    var plugin = this;
+
+    plugin.db.hincrby(getOutKey(hmail), 'TOTAL', 1, function (err, count) {
+        if (err) {
+            plugin.logerror("increment_outbound_limit: " + err);
+            return next(); // just deliver
+        }
+
+        if (!plugin.cfg.outbound[hmail.domain]) return next();
+        var limit = parseInt(plugin.cfg.outbound[hmail.domain], 10);
+        if (!limit) return next();
+
+        count = parseInt(count, 10);
+        if (count <= limit) return next();
+
+        var delay = plugin.cfg.outbound.delay || 30;
+        next(constants.delay, delay);
+    });
+}
+
+exports.decrement_outbound_limit = function (next, hmail) {
+    this.db.hincrby(getOutKey(hmail), 'TOTAL', -1);
+    return next();
+}

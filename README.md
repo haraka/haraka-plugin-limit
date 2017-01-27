@@ -4,10 +4,30 @@
 [![Code Climate][clim-img]][clim-url]
 [![NPM][npm-img]][npm-url]
 
-Apply many types of limits to SMTP connections.
+Apply many types of limits to SMTP connections:
+
+    - concurrent connections
+    - max recipients
+    - max unrecognized commands
+    - max SMTP errors
+    - outbound concurrency
+    - rate limits
+        - max connections / period
+        - max recipients / period
+            - by host
+            - by sender
+        - max null recipients / period
 
 Each limit type has values that can be defined in limit.ini. The default is empty / disabled until a value has been set.
 
+
+## Installation
+
+```sh
+cd /etc/haraka
+npm i haraka-plugin-limit
+echo 'limit' >> config/plugins
+```
 
 ### [main]
 
@@ -182,6 +202,17 @@ This section limits the rate at which a recipient can receive messages from
 a null sender (e.g. DSN, MDN etc.) over an interval.
 
 Each recipient is looked up by this test.
+
+
+### [outbound]
+
+enabled=true
+; delay=30
+;example.com=10
+
+The number after the domain is the maximum concurrency limit for that domain.
+
+Delay is the number of seconds to wait before retrying this message. Outbound concurrency is checked on every attempt to deliver.
 
 
 ### TODO
