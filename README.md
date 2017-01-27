@@ -1,5 +1,9 @@
 # limit
 
+[![Build Status][ci-img]][ci-url]
+[![Code Climate][clim-img]][clim-url]
+[![NPM][npm-img]][npm-url]
+
 Apply many types of limits to SMTP connections.
 
 Each limit type has values that can be defined in limit.ini. The default is empty / disabled until a value has been set.
@@ -10,12 +14,7 @@ Each limit type has values that can be defined in limit.ini. The default is empt
 - tarpit_delay = seconds *(optional)*
 
 Set this to the length in seconds that you want to delay every SMTP
-response to a remote client that has exceeded the rate limits.  For this
-to work the 'tarpit' plugin must be loaded **after** this plugin in
-config/plugins.
-
-If 'tarpit' is not loaded or is loaded before this plugin, then no
-rate throttling will occur.
+response to a remote client that has exceeded the rate limits.
 
 
 ## [redis]
@@ -26,16 +25,17 @@ Redis is the cluster-safe storage backend for maintaining the counters necessary
 - port (default: 6379)
 - db   (default: 0)
 
-If this section or any values are missing, the defaults from redis.ini are used.
+If this [redis] section or any values are missing, the defaults from redis.ini are used.
 
 
 ## concurrency
 
-When `[concurrency]max` is defined, it limits the maximum number of simultaneous connections per IP address. Connection attempts in excess of the limit are delayed for `disconnect_delay` seconds (default: 3) before being disconnected.
+When `[concurrency]max` is defined, it limits the maximum number of simultaneous connections per IP address. Connection attempts in excess of the limit are optionally delayed before being disconnected.
 
-This works best in conjunction with a history / reputation database, so that
+This works well in conjunction with a history / reputation database, so that
 one can assign very low concurrency (1) to bad or unknown senders and higher
 limits for reputable mail servers.
+
 
 ### History
 
@@ -80,10 +80,9 @@ When `[errors]max` is set, a connection that exceeeds the limit is disconnected.
 # Rate Limits
 
 By default DENYSOFT will be returned when rate limits are exceeded. You can
-instead tarpit the connection, adding a delay before every response. This
-requires the 'tarpit' plugin to run immediately after this plugin.
+also tarpit the connection delaying every response.
 
-Missing sections disables that particular test.
+Missing sections disable that particular test.
 
 They all use a common configuration format:
 
@@ -185,21 +184,22 @@ a null sender (e.g. DSN, MDN etc.) over an interval.
 Each recipient is looked up by this test.
 
 
+### TODO
+
+Code coverage for plugins doesn't work because we run plugins under
+vm.runInNewContext().
+
+[![Code Coverage][cov-img]][cov-url]
+[![Greenkeeper badge][gk-img]][gk-url]
 
 
-# Error Handling
-
-## Too high counters
-
-If Haraka is restarted or crashes while active connections are open, the
-concurrency counters might be inflated.
-
-## Too low counters
-
-Connections that are open while the collections are emptied will be too low.
-When that happens, log messages like these might be emitted:
-
-    resetting 0 to 1
-    resetting -1 to 1
-
-This is a harmless error condition that is repaired automatically.
+[ci-img]: https://travis-ci.org/haraka/haraka-plugin-limit.svg
+[ci-url]: https://travis-ci.org/haraka/haraka-plugin-limit
+[cov-img]: https://codecov.io/github/haraka/haraka-plugin-limit/coverage.svg
+[cov-url]: https://codecov.io/github/haraka/haraka-plugin-limit
+[clim-img]: https://codeclimate.com/github/haraka/haraka-plugin-limit/badges/gpa.svg
+[clim-url]: https://codeclimate.com/github/haraka/haraka-plugin-limit
+[gk-img]: https://badges.greenkeeper.io/haraka/haraka-plugin-limit.svg
+[gk-url]: https://greenkeeper.io/
+[npm-img]: https://nodei.co/npm/haraka-plugin-limit.png
+[npm-url]: https://www.npmjs.com/package/haraka-plugin-limit
