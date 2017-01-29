@@ -13,9 +13,10 @@
     "redis": "^2.6.5"
   },
   "devDependencies": {
-    "address-rfc2821": "^1.0.1",
+    "address-rfc2821": "*",
     "eslint": "^3.14.1",
-    "haraka-test-fixtures": "^1.0.13",
+    "eslint-plugin-haraka": "*",
+    "haraka-test-fixtures": "*",
     "nodeunit": "^0.10.2"
   },
   "scripts": {
