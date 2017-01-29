@@ -215,6 +215,16 @@ The number after the domain is the maximum concurrency limit for that domain.
 Delay is the number of seconds to wait before retrying this message. Outbound concurrency is checked on every attempt to deliver.
 
 
+## CAUTION
+
+Applying strict connection and rate limits is an effective way to reduce spam delivery. It's also an effective way to inflict a stampeding herd on your mail server. When spam/malware is delivered by MTAs that have queue retries, if you disconnect early (which the rate limits do) with a 400 series code (a sane default), the remote is likely to try again. And again. And again. And again. This can cause an obscene rise in the number of connections your mail server handles. Plan a strategy for handling that.
+
+## Strategies
+
+- Don't enforce limits early. I use karma and wait until DATA before disconnecting. By then, the score of the connection is determinate and I can return a 500 series code telling the remote not to try again.
+- enforce rate limits with your firewall instead
+
+
 ### TODO
 
 Code coverage for plugins doesn't work because we run plugins under
