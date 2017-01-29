@@ -1,5 +1,7 @@
 'use strict';
 
+var path         = require('path');
+
 var Address      = require('address-rfc2821').Address;
 var constants    = require('haraka-constants');
 var fixtures     = require('haraka-test-fixtures');
@@ -16,7 +18,7 @@ exports.lookup_host_key = {
     },
     'rate_conn' : function (test) {
         test.expect(3);
-        this.plugin.lookup_host_key('rate_conn', this.connection.remote, function (err, ip, limit) {
+        this.plugin.lookup_host_key('rate_conn', this.connection, function (err, ip, limit) {
             test.equal(err, undefined);
             test.equal(ip, '1.2.3.4');
             test.equal(limit, 5);
@@ -25,7 +27,7 @@ exports.lookup_host_key = {
     },
     'rate_rcpt_host' : function (test) {
         test.expect(3);
-        this.plugin.lookup_host_key('rate_rcpt_host', this.connection.remote, function (err, ip, limit) {
+        this.plugin.lookup_host_key('rate_rcpt_host', this.connection, function (err, ip, limit) {
             test.equal(err, undefined);
             test.equal(ip, '1.2.3.4');
             test.equal(limit, '50/5m');
@@ -104,6 +106,8 @@ exports.rate_limit = {
 exports.rate_conn = {
     setUp : function (done) {
         this.plugin = new fixtures.plugin('rate_limit');
+        this.plugin.config = this.plugin.config.module_config(path.resolve('test'));
+
         this.connection = new fixtures.connection.createConnection();
         this.connection.remote.ip = '1.2.3.4';
         this.connection.remote.host = 'mail.example.com';
@@ -117,23 +121,51 @@ exports.rate_conn = {
     },
     'default limit' : function (test) {
         test.expect(3);
-        this.plugin.rate_conn(function (code, msg) {
+        var plugin = this.plugin;
+        var connection = this.connection;
 
-            var rc = this.connection.results.get(this.plugin.name);
-            test.ok(rc.rate_conn);
+        plugin.rate_conn_increment(function () {
+            plugin.rate_conn_enforce(function (code, msg) {
+                var rc = connection.results.get(plugin.name);
+                test.ok(rc.rate_conn);
 
-            var match = /([\d]+)\/([\d]+)$/.exec(rc.rate_conn);  // 1/5
+                var match = /([\d]+):(.*)$/.exec(rc.rate_conn);  // 1/5
 
-            if (parseInt(match[1]) <= parseInt(match[2])) {
-                test.equal(code, undefined);
-                test.equal(msg, undefined);
-            }
-            else {
-                test.equal(code, constants.DENYSOFTDISCONNECT);
-                test.equal(msg, 'connection rate limit exceeded');
-            }
-            test.done();
-        }.bind(this),
-        this.connection);
+                if (parseInt(match[1]) <= parseInt(match[2])) {
+                    test.equal(code, undefined);
+                    test.equal(msg, undefined);
+                }
+                else {
+                    test.equal(code, constants.DENYSOFTDISCONNECT);
+                    test.equal(msg, 'connection rate limit exceeded');
+                }
+                test.done();
+            }.bind(this),
+            connection);
+        }, connection);
+    },
+    'defined limit' : function (test) {
+        test.expect(3);
+        var plugin = this.plugin;
+        var connection = this.connection;
+        plugin.cfg.rate_conn['1.2.3.4'] = '1/5m';
+
+        plugin.rate_conn_increment(function () {
+            plugin.rate_conn_enforce(function (code, msg) {
+                var rc = connection.results.get(plugin.name);
+                test.ok(rc.rate_conn);
+                var match = /^([\d]+):(.*)$/.exec(rc.rate_conn);  // 1/5m
+                if (parseInt(match[1]) <= parseInt(match[2])) {
+                    test.equal(code, undefined);
+                    test.equal(msg, undefined);
+                }
+                else {
+                    test.equal(code, constants.DENYSOFTDISCONNECT);
+                    test.equal(msg, 'connection rate limit exceeded');
+                }
+                test.done();
+            }.bind(this),
+            connection);
+        }, connection);
     },
 }
