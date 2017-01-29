@@ -13,9 +13,9 @@ exports.register = function () {
     plugin.load_limit_ini();
 
     if (plugin.cfg.concurrency) {
-        plugin.register_hook('connect_init', 'incr_concurrency');
+        plugin.register_hook('connect_init', 'conn_concur_incr');
         plugin.register_hook('connect',      'check_concurrency');
-        plugin.register_hook('disconnect',   'decr_concurrency');
+        plugin.register_hook('disconnect',   'conn_concur_decr');
     }
 
     if (plugin.cfg.errors) {
@@ -33,7 +33,7 @@ exports.register = function () {
     }
 
     if (plugin.cfg.rate_conn) {
-        plugin.register_hook('connect_init', 'rate_conn_increment');
+        plugin.register_hook('connect_init', 'rate_conn_incr');
         plugin.register_hook('connect',      'rate_conn_enforce');
     }
     if (plugin.cfg.rate_rcpt_host) {
@@ -51,10 +51,10 @@ exports.register = function () {
     }
 
     if (plugin.cfg.outbound.enabled) {
-        plugin.register_hook('send_email', 'increment_outbound_limit');
-        plugin.register_hook('delivered',  'decrement_outbound_limit');
-        plugin.register_hook('deferred',   'decrement_outbound_limit');
-        plugin.register_hook('bounce',     'decrement_outbound_limit');
+        plugin.register_hook('send_email', 'outbound_increment');
+        plugin.register_hook('delivered',  'outbound_decrement');
+        plugin.register_hook('deferred',   'outbound_decrement');
+        plugin.register_hook('bounce',     'outbound_decrement');
     }
 };
 
@@ -80,7 +80,7 @@ exports.shutdown = function () {
     if (this.db) this.db.quit();
 }
 
-exports.max_unrecognized_commands = function(next, connection, cmd) {
+exports.max_unrecognized_commands = function (next, connection, cmd) {
     var plugin = this;
     if (!plugin.cfg.unrecognized_commands) return next();
 
@@ -130,6 +130,7 @@ exports.get_history_limit = function (type, connection) {
     var plugin = this;
 
     var history_cfg = type + '_history';
+    if (!plugin.cfg[history_cfg]) return;
 
     var history_plugin = plugin.cfg[history_cfg].plugin;
     if (!history_plugin) return;
@@ -173,20 +174,20 @@ exports.get_limit = function (type, connection) {
     return plugin.cfg[type].max || plugin.cfg[type].default;
 };
 
-exports.incr_concurrency = function (next, connection) {
+exports.conn_concur_incr = function (next, connection) {
     var plugin = this;
     if (!plugin.cfg.concurrency) return next();
 
-    var dbkey = plugin.get_key(connection);
+    var dbkey = plugin.get_concurrency_key(connection);
 
     plugin.db.incr(dbkey, function (err, count) {
         if (err) {
-            connection.results.add(plugin, { err: 'incr_concurrency:' + err });
+            connection.results.add(plugin, { err: 'conn_concur_incr:' + err });
             return next();
         }
 
         if (isNaN(count)) {
-            connection.results.add(plugin, {err: 'incr_concurrency got isNaN'});
+            connection.results.add(plugin, {err: 'conn_concur_incr got isNaN'});
             return next();
         }
 
@@ -205,7 +206,7 @@ exports.incr_concurrency = function (next, connection) {
     });
 };
 
-exports.get_key = function (connection) {
+exports.get_concurrency_key = function (connection) {
     return 'concurrency|' + connection.remote.ip;
 };
 
@@ -250,18 +251,18 @@ exports.penalize = function (connection, disconnect, msg, next) {
     }, delay * 1000);
 }
 
-exports.decr_concurrency = function (next, connection) {
+exports.conn_concur_decr = function (next, connection) {
     var plugin = this;
     if (!plugin.cfg.concurrency) return next();
 
-    var dbkey = plugin.get_key(connection);
+    var dbkey = plugin.get_concurrency_key(connection);
     plugin.db.incrby(dbkey, -1, function (err, concurrent) {
-        if (err) connection.results.add(plugin, { err: 'decr_concurrency:' + err })
+        if (err) connection.results.add(plugin, { err: 'conn_concur_decr:' + err })
         return next();
     });
 };
 
-exports.lookup_host_key = function (type, connection, cb) {
+exports.get_host_key = function (type, connection, cb) {
     var plugin = this;
     if (!plugin.cfg[type]) {
         return cb(new Error(type + ': not configured'));
@@ -413,7 +414,7 @@ exports.rate_limit = function (connection, key, value, cb) {
 exports.rate_rcpt_host_incr = function (next, connection) {
     var plugin = this;
 
-    plugin.lookup_host_key('rate_rcpt_host', connection, function (err, key, value) {
+    plugin.get_host_key('rate_rcpt_host', connection, function (err, key, value) {
         if (!key || !value) return next();
 
         key = 'rate_rcpt_host:' + key;
@@ -427,7 +428,7 @@ exports.rate_rcpt_host_incr = function (next, connection) {
 exports.rate_rcpt_host_enforce = function (next, connection) {
     var plugin = this;
 
-    plugin.lookup_host_key('rate_rcpt_host', connection, function (err, key, value) {
+    plugin.get_host_key('rate_rcpt_host', connection, function (err, key, value) {
         if (err) {
             connection.results.add(plugin, { err: 'rate_rcpt_host:' + err });
             return next();
@@ -458,10 +459,10 @@ exports.rate_rcpt_host_enforce = function (next, connection) {
     });
 }
 
-exports.rate_conn_increment = function (next, connection) {
+exports.rate_conn_incr = function (next, connection) {
     var plugin = this;
 
-    plugin.lookup_host_key('rate_conn', connection, function (err, key, value) {
+    plugin.get_host_key('rate_conn', connection, function (err, key, value) {
         if (!key || !value) return next();
 
         key = 'rate_conn:' + key;
@@ -476,7 +477,7 @@ exports.rate_conn_increment = function (next, connection) {
 exports.rate_conn_enforce = function (next, connection) {
     var plugin = this;
 
-    plugin.lookup_host_key('rate_conn', connection, function (err, key, value) {
+    plugin.get_host_key('rate_conn', connection, function (err, key, value) {
         if (err) {
             connection.results.add(plugin, { err: 'rate_conn:' + err });
             return next();
@@ -592,12 +593,12 @@ function getOutKey (hmail) {
     return 'outbound-rate:' + hmail.domain;
 }
 
-exports.increment_outbound_limit = function (next, hmail) {
+exports.outbound_increment = function (next, hmail) {
     var plugin = this;
 
     plugin.db.hincrby(getOutKey(hmail), 'TOTAL', 1, function (err, count) {
         if (err) {
-            plugin.logerror("increment_outbound_limit: " + err);
+            plugin.logerror("outbound_increment: " + err);
             return next(); // just deliver
         }
 
@@ -613,7 +614,7 @@ exports.increment_outbound_limit = function (next, hmail) {
     });
 }
 
-exports.decrement_outbound_limit = function (next, hmail) {
+exports.outbound_decrement = function (next, hmail) {
     this.db.hincrby(getOutKey(hmail), 'TOTAL', -1);
     return next();
 }

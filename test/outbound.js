@@ -17,11 +17,11 @@ var _set_up = function (done) {
     this.server);
 };
 
-exports.increment_outbound_limit = {
+exports.outbound_increment = {
     setUp : _set_up,
     'no limit, no delay': function (test) {
         test.expect(2);
-        this.plugin.increment_outbound_limit(function (code, msg) {
+        this.plugin.outbound_increment(function (code, msg) {
             test.equal(code, undefined);
             test.equal(msg, undefined);
             test.done();
@@ -33,7 +33,7 @@ exports.increment_outbound_limit = {
         var self = this;
         self.plugin.cfg.outbound['slow.test.com'] = 3;
         self.plugin.db.hset('outbound-rate:slow.test.com', 'TOTAL', 4, function () {
-            self.plugin.increment_outbound_limit(function (code, delay) {
+            self.plugin.outbound_increment(function (code, delay) {
                 test.equal(code, constants.delay);
                 test.equal(delay, 30);
                 test.done();

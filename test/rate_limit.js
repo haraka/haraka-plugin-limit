@@ -6,7 +6,7 @@ var Address      = require('address-rfc2821').Address;
 var constants    = require('haraka-constants');
 var fixtures     = require('haraka-test-fixtures');
 
-exports.lookup_host_key = {
+exports.get_host_key = {
     setUp : function (done) {
         this.plugin = new fixtures.plugin('rate_limit');
 
@@ -18,7 +18,7 @@ exports.lookup_host_key = {
     },
     'rate_conn' : function (test) {
         test.expect(3);
-        this.plugin.lookup_host_key('rate_conn', this.connection, function (err, ip, limit) {
+        this.plugin.get_host_key('rate_conn', this.connection, function (err, ip, limit) {
             test.equal(err, undefined);
             test.equal(ip, '1.2.3.4');
             test.equal(limit, 5);
@@ -27,7 +27,7 @@ exports.lookup_host_key = {
     },
     'rate_rcpt_host' : function (test) {
         test.expect(3);
-        this.plugin.lookup_host_key('rate_rcpt_host', this.connection, function (err, ip, limit) {
+        this.plugin.get_host_key('rate_rcpt_host', this.connection, function (err, ip, limit) {
             test.equal(err, undefined);
             test.equal(ip, '1.2.3.4');
             test.equal(limit, '50/5m');
@@ -124,7 +124,7 @@ exports.rate_conn = {
         var plugin = this.plugin;
         var connection = this.connection;
 
-        plugin.rate_conn_increment(function () {
+        plugin.rate_conn_incr(function () {
             plugin.rate_conn_enforce(function (code, msg) {
                 var rc = connection.results.get(plugin.name);
                 test.ok(rc.rate_conn);
@@ -150,7 +150,7 @@ exports.rate_conn = {
         var connection = this.connection;
         plugin.cfg.rate_conn['1.2.3.4'] = '1/5m';
 
-        plugin.rate_conn_increment(function () {
+        plugin.rate_conn_incr(function () {
             plugin.rate_conn_enforce(function (code, msg) {
                 var rc = connection.results.get(plugin.name);
                 test.ok(rc.rate_conn);
