@@ -176,6 +176,7 @@ exports.get_limit = function (type, connection) {
 
 exports.conn_concur_incr = function (next, connection) {
     var plugin = this;
+    if (!plugin.db) return next();
     if (!plugin.cfg.concurrency) return next();
 
     var dbkey = plugin.get_concurrency_key(connection);
@@ -253,6 +254,7 @@ exports.penalize = function (connection, disconnect, msg, next) {
 
 exports.conn_concur_decr = function (next, connection) {
     var plugin = this;
+    if (!plugin.db) return next();
     if (!plugin.cfg.concurrency) return next();
 
     var dbkey = plugin.get_concurrency_key(connection);
@@ -393,6 +395,7 @@ exports.rate_limit = function (connection, key, value, cb) {
 
     // CAUTION: !value would match that 0 value -^
     if (!key || !value) return cb();
+    if (!plugin.db) return cb();
 
     var limit = getLimit(value);
     var ttl = getTTL(value);
@@ -413,6 +416,7 @@ exports.rate_limit = function (connection, key, value, cb) {
 
 exports.rate_rcpt_host_incr = function (next, connection) {
     var plugin = this;
+    if (!plugin.db) return next();
 
     plugin.get_host_key('rate_rcpt_host', connection, function (err, key, value) {
         if (!key || !value) return next();
@@ -427,6 +431,7 @@ exports.rate_rcpt_host_incr = function (next, connection) {
 
 exports.rate_rcpt_host_enforce = function (next, connection) {
     var plugin = this;
+    if (!plugin.db) return next();
 
     plugin.get_host_key('rate_rcpt_host', connection, function (err, key, value) {
         if (err) {
@@ -461,6 +466,7 @@ exports.rate_rcpt_host_enforce = function (next, connection) {
 
 exports.rate_conn_incr = function (next, connection) {
     var plugin = this;
+    if (!plugin.db) return next();
 
     plugin.get_host_key('rate_conn', connection, function (err, key, value) {
         if (!key || !value) return next();
@@ -476,6 +482,7 @@ exports.rate_conn_incr = function (next, connection) {
 
 exports.rate_conn_enforce = function (next, connection) {
     var plugin = this;
+    if (!plugin.db) return next();
 
     plugin.get_host_key('rate_conn', connection, function (err, key, value) {
         if (err) {
@@ -595,6 +602,7 @@ function getOutKey (hmail) {
 
 exports.outbound_increment = function (next, hmail) {
     var plugin = this;
+    if (!plugin.db) return next();
 
     plugin.db.hincrby(getOutKey(hmail), 'TOTAL', 1, function (err, count) {
         if (err) {
@@ -615,6 +623,8 @@ exports.outbound_increment = function (next, hmail) {
 }
 
 exports.outbound_decrement = function (next, hmail) {
-    this.db.hincrby(getOutKey(hmail), 'TOTAL', -1);
+    var plugin = this;
+    if (!plugin.db) return next();
+    plugin.db.hincrby(getOutKey(hmail), 'TOTAL', -1);
     return next();
 }
