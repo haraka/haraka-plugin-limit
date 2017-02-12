@@ -504,6 +504,11 @@ exports.rate_conn_enforce = function (next, connection) {
                 return next();
             }
 
+            if (!tstamps) {
+                connection.results.add(plugin, { err: 'rate_conn:no_tstamps' });
+                return next();
+            }
+
             var d = new Date();
             d.setMinutes(d.getMinutes() - (getTTL(value) / 60));
             var periodStartTs = + d;  // date as integer
@@ -548,6 +553,7 @@ exports.rate_rcpt_sender = function (next, connection, params) {
 exports.rate_rcpt_null = function (next, connection, params) {
     var plugin = this;
 
+    if (!params) return next();
     if (Array.isArray(params)) params = params[0];
     if (params.user) return next();
 
@@ -609,6 +615,8 @@ exports.outbound_increment = function (next, hmail) {
             plugin.logerror("outbound_increment: " + err);
             return next(); // just deliver
         }
+
+        plugin.db.expire(getOutKey(hmail), 300);  // 5 min expire
 
         if (!plugin.cfg.outbound[hmail.domain]) return next();
         var limit = parseInt(plugin.cfg.outbound[hmail.domain], 10);
