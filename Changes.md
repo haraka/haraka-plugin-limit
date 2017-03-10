@@ -1,4 +1,9 @@
 
+## 1.0.3 - 2017-03-09
+
+- add `enabled=false` flag for each limit type, defaults to off, matching the docs.
+
+
 ## 1.0.2 - 2017-02-06
 
 - when redis handle goes away, skip processing
