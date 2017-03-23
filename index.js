@@ -19,9 +19,9 @@ exports.register = function () {
     }
 
     if (plugin.cfg.errors.enabled) {
-        ['helo','ehlo','mail','rcpt','data'].forEach(function (hook) {
+        ['helo','ehlo','mail','rcpt','data'].forEach(hook => {
             plugin.register_hook(hook, 'max_errors');
-        });
+        })
     }
 
     if (plugin.cfg.recipients.enabled) {
@@ -37,8 +37,8 @@ exports.register = function () {
         plugin.register_hook('connect',      'rate_conn_enforce');
     }
     if (plugin.cfg.rate_rcpt_host.enabled) {
-        plugin.register_hook('connect',      'rate_rcpt_host_enforce');
-        plugin.register_hook('rcpt',         'rate_rcpt_host_incr');
+        plugin.register_hook('connect', 'rate_rcpt_host_enforce');
+        plugin.register_hook('rcpt',    'rate_rcpt_host_incr');
     }
     if (plugin.cfg.rate_rcpt_sender.enabled) {
         plugin.register_hook('rcpt', 'rate_rcpt_sender');
@@ -56,7 +56,7 @@ exports.register = function () {
         plugin.register_hook('deferred',   'outbound_decrement');
         plugin.register_hook('bounce',     'outbound_decrement');
     }
-};
+}
 
 exports.load_limit_ini = function () {
     var plugin = this;
@@ -189,7 +189,7 @@ exports.conn_concur_incr = function (next, connection) {
 
     var dbkey = plugin.get_concurrency_key(connection);
 
-    plugin.db.incr(dbkey, function (err, count) {
+    plugin.db.incr(dbkey, (err, count) => {
         if (err) {
             connection.results.add(plugin, { err: 'conn_concur_incr:' + err });
             return next();
@@ -254,7 +254,7 @@ exports.penalize = function (connection, disconnect, msg, next) {
     var delay = plugin.cfg.main.tarpit_delay;
     connection.loginfo(plugin, 'tarpitting for ' + delay + 's');
 
-    setTimeout(function () {
+    setTimeout(() => {
         if (!connection) return;
         next(code, msg);
     }, delay * 1000);
@@ -266,7 +266,7 @@ exports.conn_concur_decr = function (next, connection) {
     if (!plugin.cfg.concurrency) return next();
 
     var dbkey = plugin.get_concurrency_key(connection);
-    plugin.db.incrby(dbkey, -1, function (err, concurrent) {
+    plugin.db.incrby(dbkey, -1, (err, concurrent) => {
         if (err) connection.results.add(plugin, { err: 'conn_concur_decr:' + err })
         return next();
     });
@@ -323,7 +323,7 @@ exports.get_host_key = function (type, connection, cb) {
     }
 
     // Default 0 = unlimited
-    return cb(null, ip, 0);
+    cb(null, ip, 0);
 };
 
 exports.get_mail_key = function (type, mail, cb) {
@@ -354,7 +354,7 @@ exports.get_mail_key = function (type, mail, cb) {
     }
 
     // Default 0 = unlimited
-    return cb(email, 0);
+    cb(email, 0);
 };
 
 function getTTL (value) {
@@ -414,34 +414,34 @@ exports.rate_limit = function (connection, key, value, cb) {
 
     connection.logdebug(plugin, 'key=' + key + ' limit=' + limit + ' ttl=' + ttl);
 
-    plugin.db.incr(key, function (err, newval) {
+    plugin.db.incr(key, (err, newval) => {
         if (err) return cb(err);
 
         if (newval === 1) plugin.db.expire(key, ttl);
         cb(err, parseInt(newval, 10) > limit); // boolean true/false
-    });
-};
+    })
+}
 
 exports.rate_rcpt_host_incr = function (next, connection) {
     var plugin = this;
     if (!plugin.db) return next();
 
-    plugin.get_host_key('rate_rcpt_host', connection, function (err, key, value) {
+    plugin.get_host_key('rate_rcpt_host', connection, (err, key, value) => {
         if (!key || !value) return next();
 
         key = 'rate_rcpt_host:' + key;
-        plugin.db.incr(key, function (err2, newval) {
+        plugin.db.incr(key, (err2, newval) => {
             if (newval === 1) plugin.db.expire(key, getTTL(value));
             next();
-        });
-    });
-};
+        })
+    })
+}
 
 exports.rate_rcpt_host_enforce = function (next, connection) {
     var plugin = this;
     if (!plugin.db) return next();
 
-    plugin.get_host_key('rate_rcpt_host', connection, function (err, key, value) {
+    plugin.get_host_key('rate_rcpt_host', connection, (err, key, value) => {
         if (err) {
             connection.results.add(plugin, { err: 'rate_rcpt_host:' + err });
             return next();
@@ -453,7 +453,7 @@ exports.rate_rcpt_host_enforce = function (next, connection) {
         var limit = parseInt(match[0], 10);
         if (!limit) return next();
 
-        plugin.db.get('rate_rcpt_host:' + key, function (err2, result) {
+        plugin.db.get('rate_rcpt_host:' + key, (err2, result) => {
             if (err2) {
                 connection.results.add(plugin, { err: 'rate_rcpt_host:' + err2 });
                 return next();
@@ -476,11 +476,11 @@ exports.rate_conn_incr = function (next, connection) {
     var plugin = this;
     if (!plugin.db) return next();
 
-    plugin.get_host_key('rate_conn', connection, function (err, key, value) {
+    plugin.get_host_key('rate_conn', connection, (err, key, value) => {
         if (!key || !value) return next();
 
         key = 'rate_conn:' + key;
-        plugin.db.hincrby(key, + new Date(), 1, function (err2, newval) {
+        plugin.db.hincrby(key, + new Date(), 1, (err2, newval) => {
             // extend key expiration on every new connection
             plugin.db.expire(key, getTTL(value) * 2);
             next();
@@ -492,7 +492,7 @@ exports.rate_conn_enforce = function (next, connection) {
     var plugin = this;
     if (!plugin.db) return next();
 
-    plugin.get_host_key('rate_conn', connection, function (err, key, value) {
+    plugin.get_host_key('rate_conn', connection, (err, key, value) => {
         if (err) {
             connection.results.add(plugin, { err: 'rate_conn:' + err });
             return next();
@@ -506,7 +506,7 @@ exports.rate_conn_enforce = function (next, connection) {
             return next();
         }
 
-        plugin.db.hgetall('rate_conn:' + key, function (err2, tstamps) {
+        plugin.db.hgetall('rate_conn:' + key, (err2, tstamps) => {
             if (err2) {
                 connection.results.add(plugin, { err: 'rate_conn:' + err });
                 return next();
@@ -522,7 +522,7 @@ exports.rate_conn_enforce = function (next, connection) {
             var periodStartTs = + d;  // date as integer
 
             var connections_in_ttl_period = 0;
-            Object.keys(tstamps).forEach(function (ts) {
+            Object.keys(tstamps).forEach(ts => {
                 if (parseInt(ts, 10) < periodStartTs) return; // older than ttl
                 connections_in_ttl_period = connections_in_ttl_period + parseInt(tstamps[ts], 10);
             })
@@ -540,9 +540,9 @@ exports.rate_conn_enforce = function (next, connection) {
 exports.rate_rcpt_sender = function (next, connection, params) {
     var plugin = this;
 
-    plugin.get_mail_key('rate_rcpt_sender', connection.transaction.mail_from, function (key, value) {
+    plugin.get_mail_key('rate_rcpt_sender', connection.transaction.mail_from, (key, value) => {
 
-        plugin.rate_limit(connection, 'rate_rcpt_sender' + ':' + key, value, function (err, over) {
+        plugin.rate_limit(connection, 'rate_rcpt_sender' + ':' + key, value, (err, over) => {
             if (err) {
                 connection.results.add(plugin, { err: 'rate_rcpt_sender:' + err });
                 return next();
@@ -566,9 +566,9 @@ exports.rate_rcpt_null = function (next, connection, params) {
     if (params.user) return next();
 
     // Message from the null sender
-    plugin.get_mail_key('rate_rcpt_null', params, function (key, value) {
+    plugin.get_mail_key('rate_rcpt_null', params, (key, value) => {
 
-        plugin.rate_limit(connection, 'rate_rcpt_null' + ':' + key, value, function (err2, over) {
+        plugin.rate_limit(connection, 'rate_rcpt_null' + ':' + key, value, (err2, over) => {
             if (err2) {
                 connection.results.add(plugin, { err: 'rate_rcpt_null:' + err2 });
                 return next();
@@ -587,9 +587,9 @@ exports.rate_rcpt_null = function (next, connection, params) {
 exports.rate_rcpt = function (next, connection, params) {
     var plugin = this;
     if (Array.isArray(params)) params = params[0];
-    plugin.get_mail_key('rate_rcpt', params, function (key, value) {
+    plugin.get_mail_key('rate_rcpt', params, (key, value) => {
 
-        plugin.rate_limit(connection, 'rate_rcpt' + ':' + key, value, function (err2, over) {
+        plugin.rate_limit(connection, 'rate_rcpt' + ':' + key, value, (err2, over) => {
             if (err2) {
                 connection.results.add(plugin, { err: 'rate_rcpt:' + err2 });
                 return next();
@@ -610,24 +610,36 @@ exports.rate_rcpt = function (next, connection, params) {
  *
  */
 
-function getOutKey (hmail) {
-    return 'outbound-rate:' + hmail.domain;
+function getOutDom (hmail) {
+    // outbound isn't internally consistent in the use of hmail.domain
+    // vs hmail.todo.domain.
+    // TODO: fix haraka/Haraka/outbound/HMailItem to be internally consistent.
+    if (hmail.todo && hmail.todo.domain) return hmail.todo.domain;
+    return hmail.domain;
+}
+
+function getOutKey (domain) {
+    return 'outbound-rate:' + domain;
 }
 
 exports.outbound_increment = function (next, hmail) {
     var plugin = this;
     if (!plugin.db) return next();
 
-    plugin.db.hincrby(getOutKey(hmail), 'TOTAL', 1, function (err, count) {
+    var outDom = getOutDom(hmail);
+    var outKey = getOutKey(outDom);
+
+    plugin.db.hincrby(outKey, 'TOTAL', 1, (err, count) => {
         if (err) {
             plugin.logerror("outbound_increment: " + err);
             return next(); // just deliver
         }
 
-        plugin.db.expire(getOutKey(hmail), 300);  // 5 min expire
 
-        if (!plugin.cfg.outbound[hmail.domain]) return next();
-        var limit = parseInt(plugin.cfg.outbound[hmail.domain], 10);
+        plugin.db.expire(outKey, 300);  // 5 min expire
+
+        if (!plugin.cfg.outbound[outDom]) return next();
+        var limit = parseInt(plugin.cfg.outbound[outDom], 10);
         if (!limit) return next();
 
         count = parseInt(count, 10);
@@ -635,12 +647,13 @@ exports.outbound_increment = function (next, hmail) {
 
         var delay = plugin.cfg.outbound.delay || 30;
         next(constants.delay, delay);
-    });
+    })
 }
 
 exports.outbound_decrement = function (next, hmail) {
     var plugin = this;
     if (!plugin.db) return next();
-    plugin.db.hincrby(getOutKey(hmail), 'TOTAL', -1);
+
+    plugin.db.hincrby(getOutKey(getOutDom(hmail)), 'TOTAL', -1);
     return next();
 }

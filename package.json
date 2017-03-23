@@ -1,23 +1,23 @@
 {
   "name": "haraka-plugin-limit",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "enforce various types of limits on remote MTAs",
   "main": "limit.js",
   "directories": {
     "test": "test"
   },
   "dependencies": {
-    "haraka-constants": "^1.0.2",
+    "haraka-constants": "*",
     "haraka-plugin-redis": "*",
     "ipaddr.js": "^1.2.0",
     "redis": "^2.6.5"
   },
   "devDependencies": {
     "address-rfc2821": "*",
-    "eslint": "^3.14.1",
+    "eslint": "*",
     "eslint-plugin-haraka": "*",
     "haraka-test-fixtures": "*",
-    "nodeunit": "^0.10.2"
+    "nodeunit": "*"
   },
   "scripts": {
     "lint": "./node_modules/.bin/eslint *.js test/*.js",
