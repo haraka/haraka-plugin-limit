@@ -1,4 +1,8 @@
 
+## 1.0.4 - 2017-03-23
+
+- for outbound, find domain at hmail.todo.domain then hmail.domain.
+
 ## 1.0.3 - 2017-03-09
 
 - add `enabled=false` flag for each limit type, defaults to off, matching the docs.
