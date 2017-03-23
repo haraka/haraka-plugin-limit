@@ -12,16 +12,16 @@ var _set_up = function (done) {
 var default_config = {
     main: { tarpit_delay: 0 },
     outbound: { enabled: false },
+    recipients: { enabled: false },
+    unrecognized_commands: { enabled: false },
+    errors: { enabled: false },
+    rate_conn: { '127': 0, enabled: false, default: 5 },
+    rate_rcpt: { '127': 0, enabled: false, default: '50/5m' },
+    rate_rcpt_host: { '127': 0, enabled: false, default: '50/5m' },
+    rate_rcpt_sender: { '127': 0, enabled: false, default: '50/5m' },
+    rate_rcpt_null: { enabled: false, default: 1 },
     redis: { db: 4, host: '127.0.0.1', port: '6379' },
-    concurrency: { plugin: 'karma', good: 10, bad: 1, none: 2 },
-    recipients: {},
-    unrecognized_commands: {},
-    errors: {},
-    rate_conn: { '127': 0, default: 5 },
-    rate_rcpt_host: { '127': 0, default: '50/5m' },
-    rate_rcpt_sender: { '127': 0, default: '50/5m' },
-    rate_rcpt: { '127': 0, default: '50/5m' },
-    rate_rcpt_null: { default: 1 }
+    concurrency: { plugin: 'karma', good: 10, bad: 1, none: 2 }
 };
 
 exports.plugin_setup = {

@@ -12,41 +12,41 @@ exports.register = function () {
 
     plugin.load_limit_ini();
 
-    if (plugin.cfg.concurrency) {
+    if (plugin.cfg.concurrency.enabled) {
         plugin.register_hook('connect_init', 'conn_concur_incr');
         plugin.register_hook('connect',      'check_concurrency');
         plugin.register_hook('disconnect',   'conn_concur_decr');
     }
 
-    if (plugin.cfg.errors) {
+    if (plugin.cfg.errors.enabled) {
         ['helo','ehlo','mail','rcpt','data'].forEach(function (hook) {
             plugin.register_hook(hook, 'max_errors');
         });
     }
 
-    if (plugin.cfg.recipients) {
+    if (plugin.cfg.recipients.enabled) {
         plugin.register_hook('rcpt', 'max_recipients');
     }
 
-    if (plugin.cfg.unrecognized_commands) {
+    if (plugin.cfg.unrecognized_commands.enabled) {
         plugin.register_hook('unrecognized_command', 'max_unrecognized_commands');
     }
 
-    if (plugin.cfg.rate_conn) {
+    if (plugin.cfg.rate_conn.enabled) {
         plugin.register_hook('connect_init', 'rate_conn_incr');
         plugin.register_hook('connect',      'rate_conn_enforce');
     }
-    if (plugin.cfg.rate_rcpt_host) {
+    if (plugin.cfg.rate_rcpt_host.enabled) {
         plugin.register_hook('connect',      'rate_rcpt_host_enforce');
         plugin.register_hook('rcpt',         'rate_rcpt_host_incr');
     }
-    if (plugin.cfg.rate_rcpt_sender) {
+    if (plugin.cfg.rate_rcpt_sender.enabled) {
         plugin.register_hook('rcpt', 'rate_rcpt_sender');
     }
-    if (plugin.cfg.rate_rcpt_null) {
+    if (plugin.cfg.rate_rcpt_null.enabled) {
         plugin.register_hook('rcpt', 'rate_rcpt_null');
     }
-    if (plugin.cfg.rate_rcpt) {
+    if (plugin.cfg.rate_rcpt.enabled) {
         plugin.register_hook('rcpt', 'rate_rcpt');
     }
 
@@ -62,7 +62,15 @@ exports.load_limit_ini = function () {
     var plugin = this;
     plugin.cfg = plugin.config.get('limit.ini', {
         booleans: [
-            '-outbound.enabled'
+            '-outbound.enabled',
+            '-recipients.enabled',
+            '-unrecognized_commands.enabled',
+            '-errors.enabled',
+            '-rate_conn.enabled',
+            '-rate_rcpt.enabled',
+            '-rate_rcpt_host.enabled',
+            '-rate_rcpt_sender.enabled',
+            '-rate_rcpt_null.enabled',
         ]
     },
     function () {
