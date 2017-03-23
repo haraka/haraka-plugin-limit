@@ -56,7 +56,7 @@ exports.register = function () {
         plugin.register_hook('deferred',   'outbound_decrement');
         plugin.register_hook('bounce',     'outbound_decrement');
     }
-};
+}
 
 exports.load_limit_ini = function () {
     var plugin = this;
@@ -610,24 +610,36 @@ exports.rate_rcpt = function (next, connection, params) {
  *
  */
 
-function getOutKey (hmail) {
-    return 'outbound-rate:' + hmail.domain;
+function getOutDom (hmail) {
+    // outbound isn't internally consistent in the use of hmail.domain
+    // vs hmail.todo.domain.
+    // TODO: fix haraka/Haraka/outbound/HMailItem to be internally consistent.
+    if (hmail.todo && hmail.todo.domain) return hmail.todo.domain;
+    return hmail.domain;
+}
+
+function getOutKey (domain) {
+    return 'outbound-rate:' + domain;
 }
 
 exports.outbound_increment = function (next, hmail) {
     var plugin = this;
     if (!plugin.db) return next();
 
-    plugin.db.hincrby(getOutKey(hmail), 'TOTAL', 1, function (err, count) {
+    var outDom = getOutDom(hmail);
+    var outKey = getOutKey(outDom);
+
+    plugin.db.hincrby(outKey, 'TOTAL', 1, function (err, count) {
         if (err) {
             plugin.logerror("outbound_increment: " + err);
             return next(); // just deliver
         }
 
-        plugin.db.expire(getOutKey(hmail), 300);  // 5 min expire
 
-        if (!plugin.cfg.outbound[hmail.domain]) return next();
-        var limit = parseInt(plugin.cfg.outbound[hmail.domain], 10);
+        plugin.db.expire(outKey, 300);  // 5 min expire
+
+        if (!plugin.cfg.outbound[outDom]) return next();
+        var limit = parseInt(plugin.cfg.outbound[outDom], 10);
         if (!limit) return next();
 
         count = parseInt(count, 10);
@@ -635,12 +647,13 @@ exports.outbound_increment = function (next, hmail) {
 
         var delay = plugin.cfg.outbound.delay || 30;
         next(constants.delay, delay);
-    });
+    })
 }
 
 exports.outbound_decrement = function (next, hmail) {
     var plugin = this;
     if (!plugin.db) return next();
-    plugin.db.hincrby(getOutKey(hmail), 'TOTAL', -1);
+
+    plugin.db.hincrby(getOutKey(getOutDom(hmail)), 'TOTAL', -1);
     return next();
 }
