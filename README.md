@@ -1,6 +1,7 @@
 # limit
 
 [![Build Status][ci-img]][ci-url]
+[![Windows Build Status][ci-win-img]][ci-win-url]
 [![Code Climate][clim-img]][clim-url]
 [![NPM][npm-img]][npm-url]
 
@@ -243,6 +244,8 @@ vm.runInNewContext().
 
 [ci-img]: https://travis-ci.org/haraka/haraka-plugin-limit.svg
 [ci-url]: https://travis-ci.org/haraka/haraka-plugin-limit
+[ci-win-img]: https://ci.appveyor.com/api/projects/status/lfpoq64p53tylqww?svg=true
+[ci-win-url]: https://ci.appveyor.com/project/msimerson/haraka-plugin-limit
 [cov-img]: https://codecov.io/github/haraka/haraka-plugin-limit/coverage.svg
 [cov-url]: https://codecov.io/github/haraka/haraka-plugin-limit
 [clim-img]: https://codeclimate.com/github/haraka/haraka-plugin-limit/badges/gpa.svg
