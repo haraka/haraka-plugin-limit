@@ -20,9 +20,9 @@
     "nodeunit": "*"
   },
   "scripts": {
-    "lint": "./node_modules/.bin/eslint *.js test/*.js",
-    "lintfix": "./node_modules/.bin/eslint --fix *.js test/*.js",
-    "test": "./run_tests"
+    "lint": "node node_modules/.bin/eslint *.js test/*.js",
+    "lintfix": "node node_modules/.bin/eslint --fix *.js test/*.js",
+    "test": "node run_tests"
   },
   "repository": {
     "type": "git",
