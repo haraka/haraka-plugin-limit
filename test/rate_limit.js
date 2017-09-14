@@ -1,10 +1,10 @@
 'use strict';
 
-var path         = require('path');
+const path         = require('path');
 
-var Address      = require('address-rfc2821').Address;
-var constants    = require('haraka-constants');
-var fixtures     = require('haraka-test-fixtures');
+const Address      = require('address-rfc2821').Address;
+const constants    = require('haraka-constants');
+const fixtures     = require('haraka-test-fixtures');
 
 exports.get_host_key = {
     setUp : function (done) {
@@ -77,7 +77,7 @@ exports.rate_limit = {
         this.plugin = new fixtures.plugin('rate_limit');
         this.connection = new fixtures.connection.createConnection();
         this.plugin.register();
-        var server = { notes: {} };
+        const server = { notes: {} };
         this.plugin.init_redis_plugin(function () {
             done();
         },
@@ -113,7 +113,7 @@ exports.rate_conn = {
         this.connection.remote.host = 'mail.example.com';
 
         this.plugin.register();
-        var server = { notes: {} };
+        const server = { notes: {} };
         this.plugin.init_redis_plugin(function () {
             done();
         },
@@ -121,15 +121,15 @@ exports.rate_conn = {
     },
     'default limit' : function (test) {
         test.expect(3);
-        var plugin = this.plugin;
-        var connection = this.connection;
+        const plugin = this.plugin;
+        const connection = this.connection;
 
         plugin.rate_conn_incr(function () {
             plugin.rate_conn_enforce(function (code, msg) {
-                var rc = connection.results.get(plugin.name);
+                const rc = connection.results.get(plugin.name);
                 test.ok(rc.rate_conn);
 
-                var match = /([\d]+):(.*)$/.exec(rc.rate_conn);  // 1/5
+                const match = /([\d]+):(.*)$/.exec(rc.rate_conn);  // 1/5
 
                 if (parseInt(match[1]) <= parseInt(match[2])) {
                     test.equal(code, undefined);
@@ -146,15 +146,15 @@ exports.rate_conn = {
     },
     'defined limit' : function (test) {
         test.expect(3);
-        var plugin = this.plugin;
-        var connection = this.connection;
+        const plugin = this.plugin;
+        const connection = this.connection;
         plugin.cfg.rate_conn['1.2.3.4'] = '1/5m';
 
         plugin.rate_conn_incr(function () {
             plugin.rate_conn_enforce(function (code, msg) {
-                var rc = connection.results.get(plugin.name);
+                const rc = connection.results.get(plugin.name);
                 test.ok(rc.rate_conn);
-                var match = /^([\d]+):(.*)$/.exec(rc.rate_conn);  // 1/5m
+                const match = /^([\d]+):(.*)$/.exec(rc.rate_conn);  // 1/5m
                 if (parseInt(match[1]) <= parseInt(match[2])) {
                     test.equal(code, undefined);
                     test.equal(msg, undefined);

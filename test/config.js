@@ -1,15 +1,15 @@
 'use strict';
 
-var path         = require('path');
-var fixtures     = require('haraka-test-fixtures');
+const path         = require('path');
+const fixtures     = require('haraka-test-fixtures');
 
-var _set_up = function (done) {
+const _set_up = function (done) {
     this.plugin = new fixtures.plugin('index');
     this.plugin.config = this.plugin.config.module_config(path.resolve('test'));
     done();
 };
 
-var default_config = {
+const default_config = {
     main: { tarpit_delay: 0 },
     outbound: { enabled: false },
     recipients: { enabled: false },

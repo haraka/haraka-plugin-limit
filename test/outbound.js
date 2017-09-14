@@ -1,10 +1,10 @@
 'use strict';
 
 // var Address      = require('address-rfc2821').Address;
-var constants    = require('haraka-constants');
-var fixtures     = require('haraka-test-fixtures');
+const constants    = require('haraka-constants');
+const fixtures     = require('haraka-test-fixtures');
 
-var _set_up = function (done) {
+const _set_up = function (done) {
     this.plugin = new fixtures.plugin('index');
     // gotta inhert b/c config loader merges in defaults from redis.ini
     // this.plugin.inherits('haraka-plugin-redis');
@@ -30,7 +30,7 @@ exports.outbound_increment = {
     },
     'limits has delay': function (test) {
         test.expect(2);
-        var self = this;
+        const self = this;
         self.plugin.cfg.outbound['slow.test.com'] = 3;
         self.plugin.db.hset('outbound-rate:slow.test.com', 'TOTAL', 4, function () {
             self.plugin.outbound_increment(function (code, delay) {
