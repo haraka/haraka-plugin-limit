@@ -1,11 +1,11 @@
 'use strict';
 
-var path         = require('path');
+const path         = require('path');
 
-var constants    = require('haraka-constants');
-var fixtures     = require('haraka-test-fixtures');
+const constants    = require('haraka-constants');
+const fixtures     = require('haraka-test-fixtures');
 
-var _set_up = function (done) {
+const _set_up = function (done) {
 
     this.plugin = new fixtures.plugin('index');
     this.plugin.config = this.plugin.config.module_config(path.resolve('test'));
@@ -22,7 +22,7 @@ exports.max_errors = {
     'none': function (test) {
         // console.log(this);
         test.expect(2);
-        var cb = function (rc, msg) {
+        const cb = function (rc, msg) {
             // console.log(arguments);
             test.equal(rc, null);
             test.equal(msg, null);
@@ -33,7 +33,7 @@ exports.max_errors = {
     'too many': function (test) {
         // console.log(this);
         test.expect(2);
-        var cb = function (rc, msg) {
+        const cb = function (rc, msg) {
             // console.log(arguments);
             test.equal(rc, constants.DENYSOFTDISCONNECT);
             test.equal(msg, 'Too many errors');
@@ -49,7 +49,7 @@ exports.max_recipients = {
     setUp : _set_up,
     'none': function (test) {
         test.expect(2);
-        var cb = function (rc, msg) {
+        const cb = function (rc, msg) {
             // console.log(arguments);
             test.equal(rc, null);
             test.equal(msg, null);
@@ -59,7 +59,7 @@ exports.max_recipients = {
     },
     'too many': function (test) {
         test.expect(2);
-        var cb = function (rc, msg) {
+        const cb = function (rc, msg) {
             // console.log(arguments);
             test.equal(rc, constants.DENYSOFT);
             test.equal(msg, 'Too many recipient attempts');
@@ -76,7 +76,7 @@ exports.max_unrecognized_commands = {
     'none': function (test) {
         // console.log(this);
         test.expect(2);
-        var cb = function (rc, msg) {
+        const cb = function (rc, msg) {
             // console.log(arguments);
             test.equal(rc, null);
             test.equal(msg, null);
@@ -87,7 +87,7 @@ exports.max_unrecognized_commands = {
     'too many': function (test) {
         // console.log(this);
         test.expect(2);
-        var cb = function (rc, msg) {
+        const cb = function (rc, msg) {
             // console.log(arguments);
             test.equal(rc, constants.DENYSOFTDISCONNECT);
             test.equal(msg, 'Too many unrecognized commands');
@@ -105,7 +105,7 @@ exports.check_concurrency = {
     setUp : _set_up,
     'none': function (test) {
         test.expect(2);
-        var cb = function (rc, msg) {
+        const cb = function (rc, msg) {
             // console.log(arguments);
             test.equal(rc, null);
             test.equal(msg, null);
@@ -115,13 +115,13 @@ exports.check_concurrency = {
     },
     'at max': function (test) {
         test.expect(2);
-        var cb = function (rc, msg) {
+        const cb = function (rc, msg) {
             // console.log(arguments);
             test.equal(rc, null);
             test.equal(msg, null);
             test.done();
         };
-        var self = this;
+        const self = this;
         self.plugin.cfg.concurrency.history = undefined;
         self.plugin.cfg.concurrency = { max: 4 };
         self.connection.results.add(self.plugin, { concurrent_count: 4 });
@@ -129,13 +129,13 @@ exports.check_concurrency = {
     },
     'too many': function (test) {
         test.expect(2);
-        var cb = function (rc, msg) {
+        const cb = function (rc, msg) {
             // console.log(arguments);
             test.equal(rc, constants.DENYSOFTDISCONNECT);
             test.equal(msg, 'Too many concurrent connections');
             test.done();
         };
-        var self = this;
+        const self = this;
         self.plugin.cfg.concurrency.history = undefined;
         self.plugin.cfg.concurrency = { max: 4 };
         self.plugin.cfg.concurrency.disconnect_delay=1;

@@ -21,6 +21,7 @@
   },
   "scripts": {
     "lint": "node node_modules/.bin/eslint *.js test/*.js",
+    "lintfix": "node node_modules/.bin/eslint --fix *.js test/*.js",
     "test": "node run_tests"
   },
   "repository": {

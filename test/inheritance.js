@@ -1,6 +1,6 @@
 'use strict';
 
-var fixtures     = require('haraka-test-fixtures');
+const fixtures     = require('haraka-test-fixtures');
 
 exports.inheritance = {
     setUp : function (done) {

@@ -1,10 +1,10 @@
 'use strict';
 
-var constants = require('haraka-constants');
-var ipaddr    = require('ipaddr.js');
+const constants = require('haraka-constants');
+const ipaddr    = require('ipaddr.js');
 
 exports.register = function () {
-    var plugin = this;
+    const plugin = this;
     plugin.inherits('haraka-plugin-redis');
 
     plugin.register_hook('init_master',  'init_redis_plugin');
@@ -59,7 +59,7 @@ exports.register = function () {
 }
 
 exports.load_limit_ini = function () {
-    var plugin = this;
+    const plugin = this;
     plugin.cfg = plugin.config.get('limit.ini', {
         booleans: [
             '-outbound.enabled',
@@ -89,15 +89,15 @@ exports.shutdown = function () {
 }
 
 exports.max_unrecognized_commands = function (next, connection, cmd) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.cfg.unrecognized_commands) return next();
 
     connection.results.push(plugin, {unrec_cmds: cmd, emit: true});
 
-    var max = parseFloat(plugin.cfg.unrecognized_commands.max);
+    const max = parseFloat(plugin.cfg.unrecognized_commands.max);
     if (!max || isNaN(max)) return next();
 
-    var uc = connection.results.get(plugin).unrec_cmds;
+    const uc = connection.results.get(plugin).unrec_cmds;
     if (!uc || !uc.length) return next();
 
     if (uc.length <= max) return next();
@@ -107,10 +107,10 @@ exports.max_unrecognized_commands = function (next, connection, cmd) {
 };
 
 exports.max_errors = function (next, connection) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.cfg.errors) return next();  // disabled in config
 
-    var max = parseFloat(plugin.cfg.errors.max);
+    const max = parseFloat(plugin.cfg.errors.max);
     if (!max || isNaN(max)) return next();
 
     if (connection.errors <= max) return next();
@@ -120,14 +120,14 @@ exports.max_errors = function (next, connection) {
 };
 
 exports.max_recipients = function (next, connection, params) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.cfg.recipients) return next(); // disabled in config
 
-    var max = plugin.get_limit('recipients', connection);
+    const max = plugin.get_limit('recipients', connection);
     if (!max || isNaN(max)) return next();
 
-    var c = connection.rcpt_count;
-    var count = c.accept + c.tempfail + c.reject + 1;
+    const c = connection.rcpt_count;
+    const count = c.accept + c.tempfail + c.reject + 1;
     if (count <= max) return next();
 
     connection.results.add(plugin, { fail: 'recipients.max' });
@@ -135,15 +135,15 @@ exports.max_recipients = function (next, connection, params) {
 };
 
 exports.get_history_limit = function (type, connection) {
-    var plugin = this;
+    const plugin = this;
 
-    var history_cfg = type + '_history';
+    const history_cfg = type + '_history';
     if (!plugin.cfg[history_cfg]) return;
 
-    var history_plugin = plugin.cfg[history_cfg].plugin;
+    const history_plugin = plugin.cfg[history_cfg].plugin;
     if (!history_plugin) return;
 
-    var results = connection.results.get(history_plugin);
+    const results = connection.results.get(history_plugin);
     if (!results) {
         connection.logerror(plugin, 'no ' + history_plugin + ' results,' +
                ' disabling history due to misconfiguration');
@@ -156,7 +156,7 @@ exports.get_history_limit = function (type, connection) {
         return;
     }
 
-    var history = parseFloat(results.history);
+    const history = parseFloat(results.history);
     connection.logdebug(plugin, 'history: ' + history);
     if (isNaN(history)) return;
 
@@ -166,7 +166,7 @@ exports.get_history_limit = function (type, connection) {
 };
 
 exports.get_limit = function (type, connection) {
-    var plugin = this;
+    const plugin = this;
 
     if (type === 'recipients') {
         if (connection.relaying && plugin.cfg.recipients.max_relaying) {
@@ -175,7 +175,7 @@ exports.get_limit = function (type, connection) {
     }
 
     if (plugin.cfg[type + '_history']) {
-        var history = plugin.get_history_limit(type, connection);
+        const history = plugin.get_history_limit(type, connection);
         if (history) return history;
     }
 
@@ -183,11 +183,11 @@ exports.get_limit = function (type, connection) {
 };
 
 exports.conn_concur_incr = function (next, connection) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.db) return next();
     if (!plugin.cfg.concurrency) return next();
 
-    var dbkey = plugin.get_concurrency_key(connection);
+    const dbkey = plugin.get_concurrency_key(connection);
 
     plugin.db.incr(dbkey, (err, count) => {
         if (err) {
@@ -220,15 +220,15 @@ exports.get_concurrency_key = function (connection) {
 };
 
 exports.check_concurrency = function (next, connection) {
-    var plugin = this;
+    const plugin = this;
 
-    var max = plugin.get_limit('concurrency', connection);
+    const max = plugin.get_limit('concurrency', connection);
     if (!max || isNaN(max)) {
         connection.results.add(plugin, {err: "concurrency: no limit?!"});
         return next();
     }
 
-    var count = parseInt(connection.results.get(plugin.name).concurrent_count);
+    const count = parseInt(connection.results.get(plugin.name).concurrent_count);
     if (isNaN(count)) {
         connection.results.add(plugin, { err: 'concurrent.unset' });
         return next();
@@ -244,14 +244,14 @@ exports.check_concurrency = function (next, connection) {
 };
 
 exports.penalize = function (connection, disconnect, msg, next) {
-    var plugin = this;
-    var code = disconnect ? constants.DENYSOFTDISCONNECT : constants.DENYSOFT;
+    const plugin = this;
+    const code = disconnect ? constants.DENYSOFTDISCONNECT : constants.DENYSOFT;
 
     if (!plugin.cfg.main.tarpit_delay) {
         return next(code, msg);
     }
 
-    var delay = plugin.cfg.main.tarpit_delay;
+    const delay = plugin.cfg.main.tarpit_delay;
     connection.loginfo(plugin, 'tarpitting for ' + delay + 's');
 
     setTimeout(() => {
@@ -261,11 +261,11 @@ exports.penalize = function (connection, disconnect, msg, next) {
 }
 
 exports.conn_concur_decr = function (next, connection) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.db) return next();
     if (!plugin.cfg.concurrency) return next();
 
-    var dbkey = plugin.get_concurrency_key(connection);
+    const dbkey = plugin.get_concurrency_key(connection);
     plugin.db.incrby(dbkey, -1, (err, concurrent) => {
         if (err) connection.results.add(plugin, { err: 'conn_concur_decr:' + err })
         return next();
@@ -273,13 +273,14 @@ exports.conn_concur_decr = function (next, connection) {
 };
 
 exports.get_host_key = function (type, connection, cb) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.cfg[type]) {
         return cb(new Error(type + ': not configured'));
     }
 
+    let ip;
     try {
-        var ip = ipaddr.parse(connection.remote.ip);
+        ip = ipaddr.parse(connection.remote.ip);
         if (ip.kind === 'ipv6') {
             ip = ipaddr.toNormalizedString();
         }
@@ -291,9 +292,9 @@ exports.get_host_key = function (type, connection, cb) {
         return cb(err);
     }
 
-    var ip_array = ((ip.kind === 'ipv6') ? ip.split(':') : ip.split('.'));
+    const ip_array = ((ip.kind === 'ipv6') ? ip.split(':') : ip.split('.'));
     while (ip_array.length) {
-        var part = ((ip.kind === 'ipv6') ? ip_array.join(':') : ip_array.join('.'));
+        const part = ((ip.kind === 'ipv6') ? ip_array.join(':') : ip_array.join('.'));
         if (plugin.cfg[type][part] || plugin.cfg[type][part] === 0) {
             return cb(null, part, plugin.cfg[type][part]);
         }
@@ -302,9 +303,9 @@ exports.get_host_key = function (type, connection, cb) {
 
     // rDNS
     if (connection.remote.host) {
-        var rdns_array = connection.remote.host.toLowerCase().split('.');
+        const rdns_array = connection.remote.host.toLowerCase().split('.');
         while (rdns_array.length) {
-            var part2 = rdns_array.join('.');
+            const part2 = rdns_array.join('.');
             if (plugin.cfg[type][part2] || plugin.cfg[type][part2] === 0) {
                 return cb(null, part2, plugin.cfg[type][part2]);
             }
@@ -313,7 +314,7 @@ exports.get_host_key = function (type, connection, cb) {
     }
 
     if (plugin.cfg[type + '_history']) {
-        var history = plugin.get_history_limit(type, connection);
+        const history = plugin.get_history_limit(type, connection);
         if (history) return cb(null, ip, history);
     }
 
@@ -327,20 +328,20 @@ exports.get_host_key = function (type, connection, cb) {
 };
 
 exports.get_mail_key = function (type, mail, cb) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.cfg[type] || !mail) return cb();
 
     // Full e-mail address (e.g. smf@fsl.com)
-    var email = mail.address();
+    const email = mail.address();
     if (plugin.cfg[type][email] || plugin.cfg[type][email] === 0) {
         return cb(email, plugin.cfg[type][email]);
     }
 
     // RHS parts e.g. host.sub.sub.domain.com
     if (mail.host) {
-        var rhs_split = mail.host.toLowerCase().split('.');
+        const rhs_split = mail.host.toLowerCase().split('.');
         while (rhs_split.length) {
-            var part = rhs_split.join('.');
+            const part = rhs_split.join('.');
             if (plugin.cfg[type][part] || plugin.cfg[type][part] === 0) {
                 return cb(part, plugin.cfg[type][part]);
             }
@@ -359,13 +360,13 @@ exports.get_mail_key = function (type, mail, cb) {
 
 function getTTL (value) {
 
-    var match = /^(\d+)(?:\/(\d+)(\S)?)?$/.exec(value);
+    const match = /^(\d+)(?:\/(\d+)(\S)?)?$/.exec(value);
     if (!match) return;
 
-    var qty = match[2];
-    var units = match[3];
+    const qty = match[2];
+    const units = match[3];
 
-    var ttl = qty ? qty : 60;  // Default 60s
+    let ttl = qty ? qty : 60;  // Default 60s
     if (!units) return ttl;
 
     // Unit
@@ -388,13 +389,13 @@ function getTTL (value) {
 }
 
 function getLimit (value) {
-    var match = /^([\d]+)/.exec(value);
+    const match = /^([\d]+)/.exec(value);
     if (!match) return 0;
     return parseInt(match[1], 10);
 }
 
 exports.rate_limit = function (connection, key, value, cb) {
-    var plugin = this;
+    const plugin = this;
 
     if (value === 0) {     // Limit disabled for this host
         connection.loginfo(this, 'rate limit disabled for: ' + key);
@@ -405,8 +406,8 @@ exports.rate_limit = function (connection, key, value, cb) {
     if (!key || !value) return cb();
     if (!plugin.db) return cb();
 
-    var limit = getLimit(value);
-    var ttl = getTTL(value);
+    const limit = getLimit(value);
+    const ttl = getTTL(value);
 
     if (!limit || ! ttl) {
         return cb(new Error('syntax error: key=' + key + ' value=' + value));
@@ -423,7 +424,7 @@ exports.rate_limit = function (connection, key, value, cb) {
 }
 
 exports.rate_rcpt_host_incr = function (next, connection) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.db) return next();
 
     plugin.get_host_key('rate_rcpt_host', connection, (err, key, value) => {
@@ -438,7 +439,7 @@ exports.rate_rcpt_host_incr = function (next, connection) {
 }
 
 exports.rate_rcpt_host_enforce = function (next, connection) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.db) return next();
 
     plugin.get_host_key('rate_rcpt_host', connection, (err, key, value) => {
@@ -449,8 +450,8 @@ exports.rate_rcpt_host_enforce = function (next, connection) {
 
         if (!key || !value) return next();
 
-        var match = /^(\d+)/.exec(value);
-        var limit = parseInt(match[0], 10);
+        const match = /^(\d+)/.exec(value);
+        const limit = parseInt(match[0], 10);
         if (!limit) return next();
 
         plugin.db.get('rate_rcpt_host:' + key, (err2, result) => {
@@ -473,7 +474,7 @@ exports.rate_rcpt_host_enforce = function (next, connection) {
 }
 
 exports.rate_conn_incr = function (next, connection) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.db) return next();
 
     plugin.get_host_key('rate_conn', connection, (err, key, value) => {
@@ -489,7 +490,7 @@ exports.rate_conn_incr = function (next, connection) {
 }
 
 exports.rate_conn_enforce = function (next, connection) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.db) return next();
 
     plugin.get_host_key('rate_conn', connection, (err, key, value) => {
@@ -500,7 +501,7 @@ exports.rate_conn_enforce = function (next, connection) {
 
         if (!key || !value) return next();
 
-        var limit = getLimit(value);
+        const limit = getLimit(value);
         if (!limit) {
             connection.results.add(plugin, { err: 'rate_conn:syntax:' + value });
             return next();
@@ -517,11 +518,11 @@ exports.rate_conn_enforce = function (next, connection) {
                 return next();
             }
 
-            var d = new Date();
+            const d = new Date();
             d.setMinutes(d.getMinutes() - (getTTL(value) / 60));
-            var periodStartTs = + d;  // date as integer
+            const periodStartTs = + d;  // date as integer
 
-            var connections_in_ttl_period = 0;
+            let connections_in_ttl_period = 0;
             Object.keys(tstamps).forEach(ts => {
                 if (parseInt(ts, 10) < periodStartTs) return; // older than ttl
                 connections_in_ttl_period = connections_in_ttl_period + parseInt(tstamps[ts], 10);
@@ -538,7 +539,7 @@ exports.rate_conn_enforce = function (next, connection) {
 };
 
 exports.rate_rcpt_sender = function (next, connection, params) {
-    var plugin = this;
+    const plugin = this;
 
     plugin.get_mail_key('rate_rcpt_sender', connection.transaction.mail_from, (key, value) => {
 
@@ -559,7 +560,7 @@ exports.rate_rcpt_sender = function (next, connection, params) {
 };
 
 exports.rate_rcpt_null = function (next, connection, params) {
-    var plugin = this;
+    const plugin = this;
 
     if (!params) return next();
     if (Array.isArray(params)) params = params[0];
@@ -585,7 +586,7 @@ exports.rate_rcpt_null = function (next, connection, params) {
 };
 
 exports.rate_rcpt = function (next, connection, params) {
-    var plugin = this;
+    const plugin = this;
     if (Array.isArray(params)) params = params[0];
     plugin.get_mail_key('rate_rcpt', params, (key, value) => {
 
@@ -623,11 +624,11 @@ function getOutKey (domain) {
 }
 
 exports.outbound_increment = function (next, hmail) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.db) return next();
 
-    var outDom = getOutDom(hmail);
-    var outKey = getOutKey(outDom);
+    const outDom = getOutDom(hmail);
+    const outKey = getOutKey(outDom);
 
     plugin.db.hincrby(outKey, 'TOTAL', 1, (err, count) => {
         if (err) {
@@ -639,19 +640,19 @@ exports.outbound_increment = function (next, hmail) {
         plugin.db.expire(outKey, 300);  // 5 min expire
 
         if (!plugin.cfg.outbound[outDom]) return next();
-        var limit = parseInt(plugin.cfg.outbound[outDom], 10);
+        const limit = parseInt(plugin.cfg.outbound[outDom], 10);
         if (!limit) return next();
 
         count = parseInt(count, 10);
         if (count <= limit) return next();
 
-        var delay = plugin.cfg.outbound.delay || 30;
+        const delay = plugin.cfg.outbound.delay || 30;
         next(constants.delay, delay);
     })
 }
 
 exports.outbound_decrement = function (next, hmail) {
-    var plugin = this;
+    const plugin = this;
     if (!plugin.db) return next();
 
     plugin.db.hincrby(getOutKey(getOutDom(hmail)), 'TOTAL', -1);

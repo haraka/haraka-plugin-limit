@@ -1,11 +1,11 @@
 'use strict';
 
-var path         = require('path');
+const path         = require('path');
 
 // var constants    = require('haraka-constants');
-var fixtures     = require('haraka-test-fixtures');
+const fixtures     = require('haraka-test-fixtures');
 
-var _set_up = function (done) {
+const _set_up = function (done) {
 
     this.plugin = new fixtures.plugin('index');
     this.plugin.config = this.plugin.config.module_config(path.resolve('test'));
