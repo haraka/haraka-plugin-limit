@@ -10,8 +10,6 @@ extends: [ eslint:recommended, plugin:haraka/recommended ]
 
 root: true
 
-rules:
-
 globals:
   OK: true
   CONT: true
