@@ -137,7 +137,7 @@ exports.max_recipients = function (next, connection, params) {
 exports.get_history_limit = function (type, connection) {
     const plugin = this;
 
-    const history_cfg = type + '_history';
+    const history_cfg = `${type}_history`;
     if (!plugin.cfg[history_cfg]) return;
 
     const history_plugin = plugin.cfg[history_cfg].plugin;
@@ -145,19 +145,19 @@ exports.get_history_limit = function (type, connection) {
 
     const results = connection.results.get(history_plugin);
     if (!results) {
-        connection.logerror(plugin, 'no ' + history_plugin + ' results,' +
-               ' disabling history due to misconfiguration');
+        connection.logerror(plugin, `no ${history_plugin} results,` +
+        	` disabling history due to misconfiguration`);
         delete plugin.cfg[history_cfg];
         return;
     }
 
     if (results.history === undefined) {
-        connection.logdebug(plugin, 'no history from : ' + history_plugin);
+        connection.logdebug(plugin, `no history from : ${history_plugin}`);
         return;
     }
 
     const history = parseFloat(results.history);
-    connection.logdebug(plugin, 'history: ' + history);
+    connection.logdebug(plugin, `history: ${history}`);
     if (isNaN(history)) return;
 
     if (history > 0) return plugin.cfg[history_cfg].good;
@@ -174,7 +174,7 @@ exports.get_limit = function (type, connection) {
         }
     }
 
-    if (plugin.cfg[type + '_history']) {
+    if (plugin.cfg[`${type}_history`]) {
         const history = plugin.get_history_limit(type, connection);
         if (history) return history;
     }
@@ -191,7 +191,7 @@ exports.conn_concur_incr = function (next, connection) {
 
     plugin.db.incr(dbkey, (err, count) => {
         if (err) {
-            connection.results.add(plugin, { err: 'conn_concur_incr:' + err });
+            connection.results.add(plugin, { err: `conn_concur_incr:${err}` });
             return next();
         }
 
@@ -205,7 +205,7 @@ exports.conn_concur_incr = function (next, connection) {
         // repair negative concurrency counters
         if (count < 1) {
             connection.results.add(plugin, {
-                msg: 'resetting concurrent ' + count + ' to 1'
+                msg: `resetting concurrent ${count} to 1`
             });
             plugin.db.set(dbkey, 1);
         }
@@ -216,7 +216,7 @@ exports.conn_concur_incr = function (next, connection) {
 };
 
 exports.get_concurrency_key = function (connection) {
-    return 'concurrency|' + connection.remote.ip;
+    return `concurrency|${connection.remote.ip}`;
 };
 
 exports.check_concurrency = function (next, connection) {
@@ -234,7 +234,7 @@ exports.check_concurrency = function (next, connection) {
         return next();
     }
 
-    connection.results.add(plugin, { concurrent: count + '/' + max });
+    connection.results.add(plugin, { concurrent: `${count}/${max}` });
 
     if (count <= max) return next();
 
@@ -252,7 +252,7 @@ exports.penalize = function (connection, disconnect, msg, next) {
     }
 
     const delay = plugin.cfg.main.tarpit_delay;
-    connection.loginfo(plugin, 'tarpitting for ' + delay + 's');
+    connection.loginfo(plugin, `tarpitting for ${delay}s`);
 
     setTimeout(() => {
         if (!connection) return;
@@ -267,7 +267,7 @@ exports.conn_concur_decr = function (next, connection) {
 
     const dbkey = plugin.get_concurrency_key(connection);
     plugin.db.incrby(dbkey, -1, (err, concurrent) => {
-        if (err) connection.results.add(plugin, { err: 'conn_concur_decr:' + err })
+        if (err) connection.results.add(plugin, { err: `conn_concur_decr:${err}` })
         return next();
     });
 };
@@ -275,7 +275,7 @@ exports.conn_concur_decr = function (next, connection) {
 exports.get_host_key = function (type, connection, cb) {
     const plugin = this;
     if (!plugin.cfg[type]) {
-        return cb(new Error(type + ': not configured'));
+        return cb(new Error(`${type}: not configured`));
     }
 
     let ip;
@@ -313,7 +313,7 @@ exports.get_host_key = function (type, connection, cb) {
         }
     }
 
-    if (plugin.cfg[type + '_history']) {
+    if (plugin.cfg[`${type}_history`]) {
         const history = plugin.get_history_limit(type, connection);
         if (history) return cb(null, ip, history);
     }
@@ -398,7 +398,7 @@ exports.rate_limit = function (connection, key, value, cb) {
     const plugin = this;
 
     if (value === 0) {     // Limit disabled for this host
-        connection.loginfo(this, 'rate limit disabled for: ' + key);
+        connection.loginfo(this, `rate limit disabled for: ${key}`);
         return cb(null, false);
     }
 
@@ -410,10 +410,10 @@ exports.rate_limit = function (connection, key, value, cb) {
     const ttl = getTTL(value);
 
     if (!limit || ! ttl) {
-        return cb(new Error('syntax error: key=' + key + ' value=' + value));
+        return cb(new Error(`syntax error: key=${key} value=${value}`));
     }
 
-    connection.logdebug(plugin, 'key=' + key + ' limit=' + limit + ' ttl=' + ttl);
+    connection.logdebug(plugin, `key=${key} limit=${limit} ttl=${ttl}`);
 
     plugin.db.incr(key, (err, newval) => {
         if (err) return cb(err);
@@ -430,7 +430,7 @@ exports.rate_rcpt_host_incr = function (next, connection) {
     plugin.get_host_key('rate_rcpt_host', connection, (err, key, value) => {
         if (!key || !value) return next();
 
-        key = 'rate_rcpt_host:' + key;
+        key = `rate_rcpt_host:${key}`;
         plugin.db.incr(key, (err2, newval) => {
             if (newval === 1) plugin.db.expire(key, getTTL(value));
             next();
@@ -444,7 +444,7 @@ exports.rate_rcpt_host_enforce = function (next, connection) {
 
     plugin.get_host_key('rate_rcpt_host', connection, (err, key, value) => {
         if (err) {
-            connection.results.add(plugin, { err: 'rate_rcpt_host:' + err });
+            connection.results.add(plugin, { err: `rate_rcpt_host:${err}` });
             return next();
         }
 
@@ -454,15 +454,15 @@ exports.rate_rcpt_host_enforce = function (next, connection) {
         const limit = parseInt(match[0], 10);
         if (!limit) return next();
 
-        plugin.db.get('rate_rcpt_host:' + key, (err2, result) => {
+        plugin.db.get(`rate_rcpt_host:${key}`, (err2, result) => {
             if (err2) {
-                connection.results.add(plugin, { err: 'rate_rcpt_host:' + err2 });
+                connection.results.add(plugin, { err: `rate_rcpt_host:${err2}` });
                 return next();
             }
 
             if (!result) return next();
             connection.results.add(plugin, {
-                rate_rcpt_host: key + ':' + result + ':' + value
+                rate_rcpt_host: `${key}:${result}:${value}`
             });
 
             if (result <= limit) return next();
@@ -480,7 +480,7 @@ exports.rate_conn_incr = function (next, connection) {
     plugin.get_host_key('rate_conn', connection, (err, key, value) => {
         if (!key || !value) return next();
 
-        key = 'rate_conn:' + key;
+        key = `rate_conn:${key}`;
         plugin.db.hincrby(key, + new Date(), 1, (err2, newval) => {
             // extend key expiration on every new connection
             plugin.db.expire(key, getTTL(value) * 2);
@@ -495,7 +495,7 @@ exports.rate_conn_enforce = function (next, connection) {
 
     plugin.get_host_key('rate_conn', connection, (err, key, value) => {
         if (err) {
-            connection.results.add(plugin, { err: 'rate_conn:' + err });
+            connection.results.add(plugin, { err: `rate_conn:${err}` });
             return next();
         }
 
@@ -503,13 +503,13 @@ exports.rate_conn_enforce = function (next, connection) {
 
         const limit = getLimit(value);
         if (!limit) {
-            connection.results.add(plugin, { err: 'rate_conn:syntax:' + value });
+            connection.results.add(plugin, { err: `rate_conn:syntax:${value}` });
             return next();
         }
 
         plugin.db.hgetall('rate_conn:' + key, (err2, tstamps) => {
             if (err2) {
-                connection.results.add(plugin, { err: 'rate_conn:' + err });
+                connection.results.add(plugin, { err: `rate_conn:${err}` });
                 return next();
             }
 
@@ -543,9 +543,9 @@ exports.rate_rcpt_sender = function (next, connection, params) {
 
     plugin.get_mail_key('rate_rcpt_sender', connection.transaction.mail_from, (key, value) => {
 
-        plugin.rate_limit(connection, 'rate_rcpt_sender' + ':' + key, value, (err, over) => {
+        plugin.rate_limit(connection, `rate_rcpt_sender:${key}`, value, (err, over) => {
             if (err) {
-                connection.results.add(plugin, { err: 'rate_rcpt_sender:' + err });
+                connection.results.add(plugin, { err: `rate_rcpt_sender:${err}` });
                 return next();
             }
 
@@ -569,9 +569,9 @@ exports.rate_rcpt_null = function (next, connection, params) {
     // Message from the null sender
     plugin.get_mail_key('rate_rcpt_null', params, (key, value) => {
 
-        plugin.rate_limit(connection, 'rate_rcpt_null' + ':' + key, value, (err2, over) => {
+        plugin.rate_limit(connection, `rate_rcpt_null:${key}`, value, (err2, over) => {
             if (err2) {
-                connection.results.add(plugin, { err: 'rate_rcpt_null:' + err2 });
+                connection.results.add(plugin, { err: `rate_rcpt_null:${err2}` });
                 return next();
             }
 
@@ -590,9 +590,9 @@ exports.rate_rcpt = function (next, connection, params) {
     if (Array.isArray(params)) params = params[0];
     plugin.get_mail_key('rate_rcpt', params, (key, value) => {
 
-        plugin.rate_limit(connection, 'rate_rcpt' + ':' + key, value, (err2, over) => {
+        plugin.rate_limit(connection, `rate_rcpt:${key}`, value, (err2, over) => {
             if (err2) {
-                connection.results.add(plugin, { err: 'rate_rcpt:' + err2 });
+                connection.results.add(plugin, { err: `rate_rcpt:${err2}` });
                 return next();
             }
 
@@ -632,7 +632,7 @@ exports.outbound_increment = function (next, hmail) {
 
     plugin.db.hincrby(outKey, 'TOTAL', 1, (err, count) => {
         if (err) {
-            plugin.logerror("outbound_increment: " + err);
+            plugin.logerror(`outbound_increment: ${err}`);
             return next(); // just deliver
         }
 
