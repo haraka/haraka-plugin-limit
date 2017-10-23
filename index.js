@@ -145,8 +145,7 @@ exports.get_history_limit = function (type, connection) {
 
     const results = connection.results.get(history_plugin);
     if (!results) {
-        connection.logerror(plugin, `no ${history_plugin} results,` +
-        	` disabling history due to misconfiguration`);
+        connection.logerror(plugin, `no ${history_plugin} results, disabling history due to misconfiguration`);
         delete plugin.cfg[history_cfg];
         return;
     }
