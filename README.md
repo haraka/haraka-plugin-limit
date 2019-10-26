@@ -25,12 +25,13 @@ Apply many types of limits to SMTP connections:
 ```sh
 cd /etc/haraka
 npm i haraka-plugin-limit
+grep -q ^redis config/plugins || echo 'redis' >> config/plugins
 echo 'limit' >> config/plugins
 ```
 
 ## Configure
 
-Each limit type has values that can be defined in limit.ini. See the default limit.ini in this packages config directory.
+Each limit type has values that can be defined in [limit.ini](https://github.com/haraka/haraka-plugin-limit/blob/master/config/limit.ini). See the default [limit.ini](https://github.com/haraka/haraka-plugin-limit) in this packages config directory.
 
 Each limit type is disabled until `enabled=true` is set within it's block in limit.ini.
 

@@ -17,3 +17,6 @@ globals:
   DENYSOFT: true
   DENYDISCONNECT: true
   DENYSOFTDISCONNECT: true
+
+rules:
+  no-unused-vars: 1
