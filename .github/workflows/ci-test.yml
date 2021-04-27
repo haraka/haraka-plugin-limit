@@ -14,9 +14,9 @@ jobs:
           - ubuntu-latest
           # - windows-latest  (no redis yet)
         node-version:
-          - 10
           - 12
           - 14
+          - 16
       fail-fast: false
 
     steps:
