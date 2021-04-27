@@ -507,7 +507,7 @@ exports.rate_conn_enforce = function (next, connection) {
             return next();
         }
 
-        plugin.db.hgetall(`rate_conn: ${key}`, (err2, tstamps) => {
+        plugin.db.hgetall(`rate_conn:${key}`, (err2, tstamps) => {
             if (err2) {
                 connection.results.add(plugin, { err: `rate_conn:${err}` });
                 return next();
