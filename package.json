@@ -23,7 +23,7 @@
     "lint": "npx eslint *.js test/*.js",
     "lintfix": "npx eslint --fix *.js test/*.js",
     "versions": "npx dependency-version-checker check",
-    "test": "npx mocha"
+    "test": "npx mocha --exit"
   },
   "repository": {
     "type": "git",

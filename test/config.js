@@ -1,13 +1,9 @@
 'use strict';
 
+const assert = require('assert')
+
 const path         = require('path');
 const fixtures     = require('haraka-test-fixtures');
-
-const _set_up = function (done) {
-    this.plugin = new fixtures.plugin('index');
-    this.plugin.config = this.plugin.config.module_config(path.resolve('test'));
-    done();
-};
 
 const default_config = {
     main: { tarpit_delay: 0 },
@@ -24,21 +20,24 @@ const default_config = {
     concurrency: { plugin: 'karma', good: 10, bad: 1, none: 2 }
 };
 
-exports.plugin_setup = {
-    setUp : _set_up,
-    'loads config': function (test) {
-        test.expect(1);
+describe('plugin_setup', function () {
+
+    before(function (done) {
+        this.plugin = new fixtures.plugin('index');
+        this.plugin.config = this.plugin.config.module_config(path.resolve('test'));
+        done()
+    })
+    it('loads config', function (done) {
         // gotta inherit b/c config loader merges in defaults from redis.ini
         this.plugin.inherits('haraka-plugin-redis');
         this.plugin.load_limit_ini();
-        test.deepEqual(this.plugin.cfg, default_config); // loaded config
-        test.done();
-    },
-    'registers': function (test) {
-        test.expect(1);
-        this.plugin.register();
-        test.deepEqual(this.plugin.cfg, default_config); // loaded config
-        test.done();
-    },
+        assert.deepEqual(this.plugin.cfg, default_config); // loaded config
+        done()
+    })
 
-};
+    it('registers', function (done) {
+        this.plugin.register();
+        assert.deepEqual(this.plugin.cfg, default_config); // loaded config
+        done();
+    })
+})

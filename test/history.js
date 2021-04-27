@@ -1,56 +1,55 @@
 'use strict';
 
-const path         = require('path');
+const assert = require('assert')
+const path   = require('path')
 
-// var constants    = require('haraka-constants');
+// const constants    = require('haraka-constants');
 const fixtures     = require('haraka-test-fixtures');
 
-const _set_up = function (done) {
+describe('get_history_limit', function () {
 
-    this.plugin = new fixtures.plugin('index');
-    this.plugin.config = this.plugin.config.module_config(path.resolve('test'));
+    before(function (done) {
+        this.plugin = new fixtures.plugin('index');
+        this.plugin.config = this.plugin.config.module_config(path.resolve('test'));
 
-    this.connection = new fixtures.connection.createConnection();
-    this.connection.transaction = new fixtures.transaction.createTransaction();
+        this.connection = new fixtures.connection.createConnection();
+        this.connection.transaction = new fixtures.transaction.createTransaction();
 
-    this.plugin.register();
+        this.plugin.register();
 
-    this.plugin.cfg.concurrency_history = {
-        plugin: 'karma',
-        good: 5,
-        bad: 1,
-        none: 2,
-    };
-    done();
-};
+        this.plugin.cfg.concurrency_history = {
+            plugin: 'karma',
+            good: 5,
+            bad: 1,
+            none: 2,
+        };
+        done();
+    })
 
-exports.get_history_limit = {
-    setUp: _set_up,
-    'good': function (test) {
-        test.expect(1);
+    it('good', function (done) {
         this.connection.results.add({name: 'karma'}, { history: 1 });
-        test.equal(
+        assert.equal(
             5,
             this.plugin.get_history_limit('concurrency', this.connection)
         );
-        test.done();
-    },
-    'bad': function (test) {
-        test.expect(1);
+        done();
+    })
+
+    it('bad', function (done) {
         this.connection.results.add({name: 'karma'}, { history: -1 });
-        test.equal(
+        assert.equal(
             1,
             this.plugin.get_history_limit('concurrency', this.connection)
         );
-        test.done();
-    },
-    'none': function (test) {
-        test.expect(1);
+        done();
+    })
+
+    it('none', function (done) {
         this.connection.results.add({name: 'karma'}, { history: 0 });
-        test.equal(
+        assert.equal(
             2,
             this.plugin.get_history_limit('concurrency', this.connection)
         );
-        test.done();
-    }
-}
+        done();
+    })
+})

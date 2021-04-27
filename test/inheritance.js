@@ -1,29 +1,32 @@
 'use strict';
 
+const assert = require('assert')
+
 const fixtures     = require('haraka-test-fixtures');
 
-exports.inheritance = {
-    setUp : function (done) {
+describe('inheritance', function () {
+
+    beforeEach(function (done) {
         this.plugin = new fixtures.plugin('index');
         done();
-    },
-    'inherits redis': function (test) {
-        test.expect(1);
+    })
+
+    it('inherits redis', function (done) {
         this.plugin.inherits('haraka-plugin-redis');
-        test.equal(typeof this.plugin.load_redis_ini, 'function');
-        test.done();
-    },
-    'can call parent functions': function (test) {
-        test.expect(1);
+        assert.equal(typeof this.plugin.load_redis_ini, 'function');
+        done();
+    })
+
+    it('can call parent functions', function (done) {
         this.plugin.inherits('haraka-plugin-redis');
         this.plugin.load_redis_ini();
-        test.ok(this.plugin.redisCfg); // loaded config
-        test.done();
-    },
-    'register': function (test) {
-        test.expect(1);
+        assert.ok(this.plugin.redisCfg); // loaded config
+        done();
+    })
+
+    it('register', function (done) {
         this.plugin.register();
-        test.ok(this.plugin.cfg); // loaded config
-        test.done();
-    },
-};
+        assert.ok(this.plugin.cfg); // loaded config
+        done();
+    })
+})
