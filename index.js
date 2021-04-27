@@ -82,7 +82,7 @@ exports.load_limit_ini = function () {
     }
 
     plugin.merge_redis_ini();
-};
+}
 
 exports.shutdown = function () {
     if (this.db) this.db.quit();
@@ -104,7 +104,7 @@ exports.max_unrecognized_commands = function (next, connection, cmd) {
 
     connection.results.add(plugin, { fail: 'unrec_cmds.max' });
     plugin.penalize(connection, true, 'Too many unrecognized commands', next);
-};
+}
 
 exports.max_errors = function (next, connection) {
     const plugin = this;
@@ -117,7 +117,7 @@ exports.max_errors = function (next, connection) {
 
     connection.results.add(plugin, {fail: 'errors.max'});
     plugin.penalize(connection, true, 'Too many errors', next);
-};
+}
 
 exports.max_recipients = function (next, connection, params) {
     const plugin = this;
@@ -132,7 +132,7 @@ exports.max_recipients = function (next, connection, params) {
 
     connection.results.add(plugin, { fail: 'recipients.max' });
     plugin.penalize(connection, false, 'Too many recipient attempts', next);
-};
+}
 
 exports.get_history_limit = function (type, connection) {
     const plugin = this;
@@ -162,7 +162,7 @@ exports.get_history_limit = function (type, connection) {
     if (history > 0) return plugin.cfg[history_cfg].good;
     if (history < 0) return plugin.cfg[history_cfg].bad;
     return plugin.cfg[history_cfg].none;
-};
+}
 
 exports.get_limit = function (type, connection) {
     const plugin = this;
@@ -179,7 +179,7 @@ exports.get_limit = function (type, connection) {
     }
 
     return plugin.cfg[type].max || plugin.cfg[type].default;
-};
+}
 
 exports.conn_concur_incr = function (next, connection) {
     const plugin = this;
@@ -212,11 +212,11 @@ exports.conn_concur_incr = function (next, connection) {
         plugin.db.expire(dbkey, 3 * 60); // 3 minute lifetime
         next();
     });
-};
+}
 
 exports.get_concurrency_key = function (connection) {
     return `concurrency|${connection.remote.ip}`;
-};
+}
 
 exports.check_concurrency = function (next, connection) {
     const plugin = this;
@@ -240,7 +240,7 @@ exports.check_concurrency = function (next, connection) {
     connection.results.add(plugin, { fail: 'concurrency.max' });
 
     plugin.penalize(connection, true, 'Too many concurrent connections', next);
-};
+}
 
 exports.penalize = function (connection, disconnect, msg, next) {
     const plugin = this;
@@ -269,7 +269,7 @@ exports.conn_concur_decr = function (next, connection) {
         if (err) connection.results.add(plugin, { err: `conn_concur_decr:${err}` })
         return next();
     });
-};
+}
 
 exports.get_host_key = function (type, connection, cb) {
     const plugin = this;
@@ -324,7 +324,7 @@ exports.get_host_key = function (type, connection, cb) {
 
     // Default 0 = unlimited
     cb(null, ip, 0);
-};
+}
 
 exports.get_mail_key = function (type, mail, cb) {
     const plugin = this;
@@ -355,7 +355,7 @@ exports.get_mail_key = function (type, mail, cb) {
 
     // Default 0 = unlimited
     cb(email, 0);
-};
+}
 
 function getTTL (value) {
 
@@ -481,6 +481,7 @@ exports.rate_conn_incr = function (next, connection) {
 
         key = `rate_conn:${key}`;
         plugin.db.hincrby(key, + new Date(), 1, (err2, newval) => {
+            if (err2) connection.results.add(plugin, { err: err2 });
             // extend key expiration on every new connection
             plugin.db.expire(key, getTTL(value) * 2);
             next();
@@ -506,7 +507,7 @@ exports.rate_conn_enforce = function (next, connection) {
             return next();
         }
 
-        plugin.db.hgetall('rate_conn:' + key, (err2, tstamps) => {
+        plugin.db.hgetall(`rate_conn:${key}`, (err2, tstamps) => {
             if (err2) {
                 connection.results.add(plugin, { err: `rate_conn:${err}` });
                 return next();
@@ -526,7 +527,7 @@ exports.rate_conn_enforce = function (next, connection) {
                 if (parseInt(ts, 10) < periodStartTs) return; // older than ttl
                 connections_in_ttl_period = connections_in_ttl_period + parseInt(tstamps[ts], 10);
             })
-            connection.results.add(plugin, { rate_conn: connections_in_ttl_period + ':' + value});
+            connection.results.add(plugin, { rate_conn: `${connections_in_ttl_period}:${value}`});
 
             if (connections_in_ttl_period <= limit) return next();
 
@@ -535,7 +536,7 @@ exports.rate_conn_enforce = function (next, connection) {
             plugin.penalize(connection, true, 'connection rate limit exceeded', next);
         });
     });
-};
+}
 
 exports.rate_rcpt_sender = function (next, connection, params) {
     const plugin = this;
@@ -556,7 +557,7 @@ exports.rate_rcpt_sender = function (next, connection, params) {
             plugin.penalize(connection, false, 'rcpt rate limit exceeded', next);
         });
     });
-};
+}
 
 exports.rate_rcpt_null = function (next, connection, params) {
     const plugin = this;
@@ -582,7 +583,7 @@ exports.rate_rcpt_null = function (next, connection, params) {
             plugin.penalize(connection, false, 'null recip rate limit', next);
         });
     });
-};
+}
 
 exports.rate_rcpt = function (next, connection, params) {
     const plugin = this;
@@ -603,7 +604,7 @@ exports.rate_rcpt = function (next, connection, params) {
             plugin.penalize(connection, false, 'rate limit exceeded', next);
         });
     });
-};
+}
 
 /*
  *        Outbound Rate Limits
@@ -619,7 +620,7 @@ function getOutDom (hmail) {
 }
 
 function getOutKey (domain) {
-    return 'outbound-rate:' + domain;
+    return `outbound-rate:${domain}`;
 }
 
 exports.outbound_increment = function (next, hmail) {
