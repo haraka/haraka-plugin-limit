@@ -1,7 +1,7 @@
 # limit
 
-[![Build Status][ci-img]][ci-url]
-[![Windows Build Status][ci-win-img]][ci-win-url]
+[![Tests][ci-img]][ci-url]
+[![Lint][ci-lint-img][ci-lint-url]
 [![Code Climate][clim-img]][clim-url]
 [![NPM][npm-img]][npm-url]
 
@@ -243,15 +243,15 @@ vm.runInNewContext().
 [![Greenkeeper badge][gk-img]][gk-url]
 
 
-[ci-img]: https://travis-ci.org/haraka/haraka-plugin-limit.svg
-[ci-url]: https://travis-ci.org/haraka/haraka-plugin-limit
-[ci-win-img]: https://ci.appveyor.com/api/projects/status/lfpoq64p53tylqww?svg=true
-[ci-win-url]: https://ci.appveyor.com/project/msimerson/haraka-plugin-limit
+[ci-img]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci-test.yml/badge.svg
+[ci-url]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci-test.yml
+[ci-lint-img]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/lint.yml/badge.svg
+[ci-lint-url]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/lint.yml
 [cov-img]: https://codecov.io/github/haraka/haraka-plugin-limit/coverage.svg
 [cov-url]: https://codecov.io/github/haraka/haraka-plugin-limit
 [clim-img]: https://codeclimate.com/github/haraka/haraka-plugin-limit/badges/gpa.svg
 [clim-url]: https://codeclimate.com/github/haraka/haraka-plugin-limit
 [gk-img]: https://badges.greenkeeper.io/haraka/haraka-plugin-limit.svg
 [gk-url]: https://greenkeeper.io/
-[npm-img]: https://nodei.co/npm/haraka-plugin-limit.png
+[npm-img]: https://img.shields.io/npm/dm/haraka-plugin-limit
 [npm-url]: https://www.npmjs.com/package/haraka-plugin-limit
