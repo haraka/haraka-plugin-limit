@@ -234,24 +234,11 @@ Applying strict connection and rate limits is an effective way to reduce spam de
 - enforce rate limits with your firewall instead
 
 
-### TODO
-
-Code coverage for plugins doesn't work because we run plugins under
-vm.runInNewContext().
-
-[![Code Coverage][cov-img]][cov-url]
-[![Greenkeeper badge][gk-img]][gk-url]
-
-
 [ci-img]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci-test.yml/badge.svg
 [ci-url]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci-test.yml
 [ci-lint-img]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/lint.yml/badge.svg
 [ci-lint-url]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/lint.yml
-[cov-img]: https://codecov.io/github/haraka/haraka-plugin-limit/coverage.svg
-[cov-url]: https://codecov.io/github/haraka/haraka-plugin-limit
 [clim-img]: https://codeclimate.com/github/haraka/haraka-plugin-limit/badges/gpa.svg
 [clim-url]: https://codeclimate.com/github/haraka/haraka-plugin-limit
-[gk-img]: https://badges.greenkeeper.io/haraka/haraka-plugin-limit.svg
-[gk-url]: https://greenkeeper.io/
 [npm-img]: https://img.shields.io/npm/dm/haraka-plugin-limit
 [npm-url]: https://www.npmjs.com/package/haraka-plugin-limit
