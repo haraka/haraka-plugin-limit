@@ -1,4 +1,4 @@
-## 1.0.5 - 2022-03-XX
+## 1.0.5 - 2022-03-08
 
 - fix invalid main field in package.json
 
