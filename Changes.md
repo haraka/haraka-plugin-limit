@@ -1,3 +1,6 @@
+## 1.0.5 - 2022-03-XX
+
+- fix invalid main field in package.json
 
 ## 1.0.4 - 2017-03-23
 
