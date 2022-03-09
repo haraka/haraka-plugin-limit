@@ -1,7 +1,7 @@
 # limit
 
 [![Tests][ci-img]][ci-url]
-[![Lint][ci-lint-img][ci-lint-url]
+[![Lint][ci-lint-img]][ci-lint-url]
 [![Code Climate][clim-img]][clim-url]
 [![NPM][npm-img]][npm-url]
 
