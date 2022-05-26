@@ -234,10 +234,8 @@ Applying strict connection and rate limits is an effective way to reduce spam de
 - enforce rate limits with your firewall instead
 
 
-[ci-img]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci-test.yml/badge.svg
-[ci-url]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci-test.yml
-[ci-lint-img]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/lint.yml/badge.svg
-[ci-lint-url]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/lint.yml
+[ci-img]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci.yml/badge.svg
+[ci-url]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci.yml
 [clim-img]: https://codeclimate.com/github/haraka/haraka-plugin-limit/badges/gpa.svg
 [clim-url]: https://codeclimate.com/github/haraka/haraka-plugin-limit
 [npm-img]: https://img.shields.io/npm/dm/haraka-plugin-limit

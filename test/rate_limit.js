@@ -7,68 +7,54 @@ const Address      = require('address-rfc2821').Address;
 const constants    = require('haraka-constants');
 const fixtures     = require('haraka-test-fixtures');
 
-function setUp (done) {
+function setUp () {
     this.plugin = new fixtures.plugin('rate_limit');
 
     this.connection = new fixtures.connection.createConnection();
     this.connection.remote = { ip: '1.2.3.4', host: 'test.com' };
 
     this.plugin.register();
-    done();
 }
 
 describe('get_host_key', function () {
     before(setUp)
-    it('rate_conn', function (done) {
-        this.plugin.get_host_key('rate_conn', this.connection, function (err, ip, limit) {
-            assert.equal(err, undefined);
-            assert.equal(ip, '1.2.3.4');
-            assert.equal(limit, 5);
-            done();
-        })
+    it('rate_conn', function () {
+        const [ ip, limit ] = this.plugin.get_host_key('rate_conn', this.connection)
+        assert.equal(ip, '1.2.3.4');
+        assert.equal(limit, 5);
     })
 
-    it('rate_rcpt_host', function (done) {
-        this.plugin.get_host_key('rate_rcpt_host', this.connection, function (err, ip, limit) {
-            assert.equal(err, undefined);
-            assert.equal(ip, '1.2.3.4');
-            assert.equal(limit, '50/5m');
-            done();
-        })
+    it('rate_rcpt_host', function () {
+        const [ ip, limit ] = this.plugin.get_host_key('rate_rcpt_host', this.connection)
+        assert.equal(ip, '1.2.3.4');
+        assert.equal(limit, '50/5m');
     })
 })
 
 describe('get_mail_key', function () {
-    beforeEach(function (done) {
+    beforeEach(function () {
         this.plugin = new fixtures.plugin('rate_limit');
         this.connection = new fixtures.connection.createConnection();
         this.plugin.register();
-        done();
     })
 
-    it('rate_rcpt_sender', function (done) {
-        this.plugin.get_mail_key('rate_rcpt_sender', new Address('<user@example.com>'), function (addr, limit) {
-            // console.log(arguments);
-            assert.equal(addr, 'user@example.com');
-            assert.equal(limit, '50/5m');
-            done();
-        });
+    it('rate_rcpt_sender', function () {
+        const [ addr, limit ] = this.plugin.get_mail_key('rate_rcpt_sender', new Address('<user@example.com>'))
+        // console.log(arguments);
+        assert.equal(addr, 'user@example.com');
+        assert.equal(limit, '50/5m');
     })
-    it('rate_rcpt_null', function (done) {
-        this.plugin.get_mail_key('rate_rcpt_null', new Address('<postmaster>'), function (addr, limit) {
-            // console.log(arguments);
-            assert.equal(addr, 'postmaster');
-            assert.equal(limit, '1');
-            done();
-        });
+    it('rate_rcpt_null', function () {
+        const [ addr, limit ] = this.plugin.get_mail_key('rate_rcpt_null', new Address('<postmaster>'))
+        // console.log(arguments);
+        assert.equal(addr, 'postmaster');
+        assert.equal(limit, '1');
     })
-    it('rate_rcpt', function (done) {
-        this.plugin.get_mail_key('rate_rcpt', new Address('<user@example.com>'), function (addr, limit) {
-            // console.log(arguments);
-            assert.equal(addr, 'user@example.com');
-            assert.equal(limit, '50/5m');
-            done();
-        });
+    it('rate_rcpt', function () {
+        const [ addr, limit ] = this.plugin.get_mail_key('rate_rcpt', new Address('<user@example.com>'))
+        // console.log(arguments);
+        assert.equal(addr, 'user@example.com');
+        assert.equal(limit, '50/5m');
     })
 })
 
@@ -84,27 +70,21 @@ describe('rate_limit', function () {
         server);
     })
 
-    it('no limit', function (done) {
-        this.plugin.rate_limit(this.connection, 'key', 0, function (err, is_limited) {
-            // console.log(arguments);
-            assert.equal(err, undefined);
-            assert.equal(is_limited, false);
-            done();
-        })
+    it('no limit', async function () {
+        const is_limited = await this.plugin.rate_limit(this.connection, 'key', 0)
+        assert.equal(is_limited, false);
     })
 
-    it('below 50/5m limit', function (done) {
-        this.plugin.rate_limit(this.connection, 'key', '50/5m', function (err, is_limited) {
-            // console.log(arguments);
-            assert.equal(err, undefined);
-            assert.equal(is_limited, false);
-            done();
-        })
+    it('below 50/5m limit', async function () {
+        const is_limited = await this.plugin.rate_limit(this.connection, 'key', '50/5m')
+        assert.equal(is_limited, false);
     })
 })
 
 describe('rate_conn', function () {
     beforeEach(function (done) {
+        this.server = { notes: {} };
+
         this.plugin = new fixtures.plugin('rate_limit');
         this.plugin.config = this.plugin.config.module_config(path.resolve('test'));
 
@@ -113,11 +93,10 @@ describe('rate_conn', function () {
         this.connection.remote.host = 'mail.example.com';
 
         this.plugin.register();
-        const server = { notes: {} };
         this.plugin.init_redis_plugin(function () {
             done();
         },
-        server);
+        this.server);
     })
 
     it('default limit', function (done) {
