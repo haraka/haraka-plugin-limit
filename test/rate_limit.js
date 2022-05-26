@@ -18,22 +18,16 @@ function setUp () {
 
 describe('get_host_key', function () {
     before(setUp)
-    it('rate_conn', function (done) {
-        this.plugin.get_host_key('rate_conn', this.connection, function (err, ip, limit) {
-            assert.equal(err, undefined);
-            assert.equal(ip, '1.2.3.4');
-            assert.equal(limit, 5);
-            done();
-        })
+    it('rate_conn', function () {
+        const [ ip, limit ] = this.plugin.get_host_key('rate_conn', this.connection)
+        assert.equal(ip, '1.2.3.4');
+        assert.equal(limit, 5);
     })
 
-    it('rate_rcpt_host', function (done) {
-        this.plugin.get_host_key('rate_rcpt_host', this.connection, function (err, ip, limit) {
-            assert.equal(err, undefined);
-            assert.equal(ip, '1.2.3.4');
-            assert.equal(limit, '50/5m');
-            done();
-        })
+    it('rate_rcpt_host', function () {
+        const [ ip, limit ] = this.plugin.get_host_key('rate_rcpt_host', this.connection)
+        assert.equal(ip, '1.2.3.4');
+        assert.equal(limit, '50/5m');
     })
 })
 

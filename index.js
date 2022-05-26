@@ -210,12 +210,11 @@ exports.conn_concur_incr = async function (next, connection) {
         }
 
         this.db.expire(dbkey, 3 * 60); // 3 minute lifetime
-        next();
     }
     catch (err) {
         connection.results.add(this, { err: `conn_concur_incr:${err}` });
-        next();
     }
+    next();
 }
 
 exports.get_concurrency_key = function (connection) {
@@ -264,8 +263,8 @@ exports.conn_concur_decr = async function (next, connection) {
     if (!this.db) return next();
     if (!this.cfg.concurrency) return next();
 
-    const dbkey = this.get_concurrency_key(connection);
     try {
+        const dbkey = this.get_concurrency_key(connection);
         await this.db.incrby(dbkey, -1)
     }
     catch (err) {
@@ -274,9 +273,12 @@ exports.conn_concur_decr = async function (next, connection) {
     next();
 }
 
-exports.get_host_key = function (type, connection, cb) {
+exports.get_host_key = function (type, connection) {
 
-    if (!this.cfg[type]) return cb(new Error(`${type}: not configured`));
+    if (!this.cfg[type]) {
+        connection.results.add(this, { err: `${type}: not configured` });
+        return
+    }
 
     let ip;
     try {
@@ -289,14 +291,15 @@ exports.get_host_key = function (type, connection, cb) {
         }
     }
     catch (err) {
-        return cb(err);
+        connection.results.add(this, { err: `${type}: ${err.message}` });
+        return
     }
 
     const ip_array = ((ip.kind === 'ipv6') ? ip.split(':') : ip.split('.'));
     while (ip_array.length) {
         const part = ((ip.kind === 'ipv6') ? ip_array.join(':') : ip_array.join('.'));
         if (this.cfg[type][part] || this.cfg[type][part] === 0) {
-            return cb(null, part, this.cfg[type][part]);
+            return [ part, this.cfg[type][part] ]
         }
         ip_array.pop();
     }
@@ -307,7 +310,7 @@ exports.get_host_key = function (type, connection, cb) {
         while (rdns_array.length) {
             const part2 = rdns_array.join('.');
             if (this.cfg[type][part2] || this.cfg[type][part2] === 0) {
-                return cb(null, part2, this.cfg[type][part2]);
+                return [ part2, this.cfg[type][part2] ]
             }
             rdns_array.pop();
         }
@@ -315,16 +318,16 @@ exports.get_host_key = function (type, connection, cb) {
 
     if (this.cfg[`${type}_history`]) {
         const history = this.get_history_limit(type, connection);
-        if (history) return cb(null, ip, history);
+        if (history) return [ ip, history ]
     }
 
     // Custom Default
     if (this.cfg[type].default) {
-        return cb(null, ip, this.cfg[type].default);
+        return [ ip, this.cfg[type].default ]
     }
 
     // Default 0 = unlimited
-    cb(null, ip, 0);
+    return [ ip, 0 ]
 }
 
 exports.get_mail_key = function (type, mail, cb) {
@@ -423,124 +426,109 @@ exports.rate_limit = async function (connection, key, value, cb) {
     }
 }
 
-exports.rate_rcpt_host_incr = function (next, connection) {
+exports.rate_rcpt_host_incr = async function (next, connection) {
     if (!this.db) return next();
 
-    this.get_host_key('rate_rcpt_host', connection, async (err, key, value) => {
-        if (!key || !value) return next();
+    const [ key, value ] = this.get_host_key('rate_rcpt_host', connection)
+    if (!key || !value) return next();
 
-        try {
-            key = `rate_rcpt_host:${key}`;
-            const newval = await this.db.incr(key)
-            if (newval === 1) this.db.expire(key, getTTL(value));
-        }
-        catch (err2) {
-            connection.results.add(this, { err2 })
-        }
+    try {
+        const newval = await this.db.incr(`rate_rcpt_host:${key}`)
+        if (newval === 1) await this.db.expire(`rate_rcpt_host:${key}`, getTTL(value));
+    }
+    catch (err) {
+        connection.results.add(this, { err })
+    }
+    next();
+}
+
+exports.rate_rcpt_host_enforce = async function (next, connection) {
+    if (!this.db) return next();
+
+    const [ key, value ] = this.get_host_key('rate_rcpt_host', connection)
+    if (!key || !value) return next();
+
+    const match = /^(\d+)/.exec(value);
+    const limit = parseInt(match[0], 10);
+    if (!limit) return next();
+
+    try {
+        const result = await this.db.get(`rate_rcpt_host:${key}`)
+
+        if (!result) return next();
+        connection.results.add(this, {
+            rate_rcpt_host: `${key}:${result}:${value}`
+        });
+
+        if (result <= limit) return next();
+
+        connection.results.add(this, { fail: 'rate_rcpt_host' });
+        this.penalize(connection, false, 'recipient rate limit exceeded', next);
+    }
+    catch (err2) {
+        connection.results.add(this, { err: `rate_rcpt_host:${err2}` });
         next();
-    })
+    }
 }
 
-exports.rate_rcpt_host_enforce = function (next, connection) {
+exports.rate_conn_incr = async function (next, connection) {
     if (!this.db) return next();
 
-    this.get_host_key('rate_rcpt_host', connection, async (err, key, value) => {
-        if (err) {
-            connection.results.add(this, { err: `rate_rcpt_host:${err}` });
+    const [ key, value ] = this.get_host_key('rate_conn', connection)
+    if (!key || !value) return next();
+
+    try {
+        await this.db.hIncrBy(`rate_conn:${key}`, (+ new Date()).toString(), 1)
+        // extend key expiration on every new connection
+        await this.db.expire(`rate_conn:${key}`, getTTL(value) * 2)
+    }
+    catch (err2) {
+        console.error(err2)
+        connection.results.add(this, { err: err2 });
+    }
+    next()
+}
+
+exports.rate_conn_enforce = async function (next, connection) {
+    if (!this.db) return next();
+
+    const [ key, value ] = this.get_host_key('rate_conn', connection)
+    if (!key || !value) return next();
+
+    const limit = getLimit(value);
+    if (!limit) {
+        connection.results.add(this, { err: `rate_conn:syntax:${value}` });
+        return next();
+    }
+
+    try {
+        const tstamps = await this.db.hGetAll(`rate_conn:${key}`)
+        if (!tstamps) {
+            connection.results.add(this, { err: 'rate_conn:no_tstamps' });
             return next();
         }
 
-        if (!key || !value) return next();
+        const d = new Date();
+        d.setMinutes(d.getMinutes() - (getTTL(value) / 60));
+        const periodStartTs = + d;  // date as integer
 
-        const match = /^(\d+)/.exec(value);
-        const limit = parseInt(match[0], 10);
-        if (!limit) return next();
+        let connections_in_ttl_period = 0;
+        Object.keys(tstamps).forEach(ts => {
+            if (parseInt(ts, 10) < periodStartTs) return; // older than ttl
+            connections_in_ttl_period = connections_in_ttl_period + parseInt(tstamps[ts], 10);
+        })
+        connection.results.add(this, { rate_conn: `${connections_in_ttl_period}:${value}`});
 
-        try {
-            const result = await this.db.get(`rate_rcpt_host:${key}`)
+        if (connections_in_ttl_period <= limit) return next();
 
-            if (!result) return next();
-            connection.results.add(this, {
-                rate_rcpt_host: `${key}:${result}:${value}`
-            });
+        connection.results.add(this, { fail: 'rate_conn' });
 
-            if (result <= limit) return next();
-
-            connection.results.add(this, { fail: 'rate_rcpt_host' });
-            this.penalize(connection, false, 'recipient rate limit exceeded', next);
-        }
-        catch (err2) {
-            connection.results.add(this, { err: `rate_rcpt_host:${err2}` });
-            next();
-        }
-    });
-}
-
-exports.rate_conn_incr = function (next, connection) {
-    if (!this.db) return next();
-
-    this.get_host_key('rate_conn', connection, async (err, key, value) => {
-        if (!key || !value) return next();
-
-        try {
-            await this.db.hIncrBy(`rate_conn:${key}`, (+ new Date()).toString(), 1)
-            // extend key expiration on every new connection
-            await this.db.expire(`rate_conn:${key}`, getTTL(value) * 2)
-        }
-        catch (err2) {
-            console.error(err2)
-            connection.results.add(this, { err: err2 });
-        }
+        this.penalize(connection, true, 'connection rate limit exceeded', next);
+    }
+    catch (err2) {
+        connection.results.add(this, { err: `rate_conn:${err}` });
         next();
-    })
-}
-
-exports.rate_conn_enforce = function (next, connection) {
-    if (!this.db) return next();
-
-    this.get_host_key('rate_conn', connection, async (err, key, value) => {
-        if (err) {
-            connection.results.add(this, { err: `rate_conn:${err}` });
-            return next();
-        }
-
-        if (!key || !value) return next();
-
-        const limit = getLimit(value);
-        if (!limit) {
-            connection.results.add(this, { err: `rate_conn:syntax:${value}` });
-            return next();
-        }
-
-        try {
-            const tstamps = await this.db.hGetAll(`rate_conn:${key}`)
-            if (!tstamps) {
-                connection.results.add(this, { err: 'rate_conn:no_tstamps' });
-                return next();
-            }
-
-            const d = new Date();
-            d.setMinutes(d.getMinutes() - (getTTL(value) / 60));
-            const periodStartTs = + d;  // date as integer
-
-            let connections_in_ttl_period = 0;
-            Object.keys(tstamps).forEach(ts => {
-                if (parseInt(ts, 10) < periodStartTs) return; // older than ttl
-                connections_in_ttl_period = connections_in_ttl_period + parseInt(tstamps[ts], 10);
-            })
-            connection.results.add(this, { rate_conn: `${connections_in_ttl_period}:${value}`});
-
-            if (connections_in_ttl_period <= limit) return next();
-
-            connection.results.add(this, { fail: 'rate_conn' });
-
-            this.penalize(connection, true, 'connection rate limit exceeded', next);
-        }
-        catch (err2) {
-            connection.results.add(this, { err: `rate_conn:${err}` });
-            next();
-        }
-    })
+    }
 }
 
 exports.rate_rcpt_sender = function (next, connection, params) {
@@ -617,11 +605,9 @@ exports.rate_rcpt = function (next, connection, params) {
  */
 
 function getOutDom (hmail) {
-    // outbound isn't internally consistent in the use of hmail.domain
-    // vs hmail.todo.domain.
+    // outbound isn't internally consistent using hmail.domain and hmail.todo.domain.
     // TODO: fix haraka/Haraka/outbound/HMailItem to be internally consistent.
-    if (hmail.todo && hmail.todo.domain) return hmail.todo.domain;
-    return hmail.domain;
+    return hmail?.todo?.domain || hmail.domain;
 }
 
 function getOutKey (domain) {
