@@ -1,10 +1,13 @@
 
 ### 1.0.6 - 2022-05-25
 
+- feat: update redis commands to be v4 compatible
+- feat: only load redis when needed, fixes #23
+- style: replaced callbacks with async/await in:
+    get_host_key, get_mail_key, and rate_limit
 - dep(eslint): v6 -> v8
 - dep(redis): 3 -> 4
 - ci: add codeql & publish
-- feat: update redis commands to be v4 compatible
 
 
 ### 1.0.5 - 2022-03-08
@@ -33,4 +36,3 @@
 
 - increment rate_conn on connect_init
 - increment rate_rcpt_host on rcpt/rcpt_ok
-
