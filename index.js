@@ -6,10 +6,8 @@ const ipaddr    = require('ipaddr.js');
 exports.register = function () {
     this.inherits('haraka-plugin-redis');
 
-    this.register_hook('init_master',  'init_redis_plugin');
-    this.register_hook('init_child',   'init_redis_plugin');
-
     this.load_limit_ini();
+    let needs_redis = 0
 
     if (this.cfg.concurrency.enabled) {
         this.register_hook('connect_init', 'conn_concur_incr');
@@ -32,28 +30,39 @@ exports.register = function () {
     }
 
     if (this.cfg.rate_conn.enabled) {
+        needs_redis++
         this.register_hook('connect_init', 'rate_conn_incr');
         this.register_hook('connect',      'rate_conn_enforce');
     }
     if (this.cfg.rate_rcpt_host.enabled) {
+        needs_redis++
         this.register_hook('connect', 'rate_rcpt_host_enforce');
         this.register_hook('rcpt',    'rate_rcpt_host_incr');
     }
     if (this.cfg.rate_rcpt_sender.enabled) {
+        needs_redis++
         this.register_hook('rcpt', 'rate_rcpt_sender');
     }
     if (this.cfg.rate_rcpt_null.enabled) {
+        needs_redis++
         this.register_hook('rcpt', 'rate_rcpt_null');
     }
     if (this.cfg.rate_rcpt.enabled) {
+        needs_redis++
         this.register_hook('rcpt', 'rate_rcpt');
     }
 
     if (this.cfg.outbound.enabled) {
+        needs_redis++
         this.register_hook('send_email', 'outbound_increment');
         this.register_hook('delivered',  'outbound_decrement');
         this.register_hook('deferred',   'outbound_decrement');
         this.register_hook('bounce',     'outbound_decrement');
+    }
+
+    if (needs_redis) {
+        this.register_hook('init_master',  'init_redis_plugin');
+        this.register_hook('init_child',   'init_redis_plugin');
     }
 }
 
