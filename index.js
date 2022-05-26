@@ -181,18 +181,15 @@ exports.get_limit = function (type, connection) {
     return plugin.cfg[type].max || plugin.cfg[type].default;
 }
 
-exports.conn_concur_incr = function (next, connection) {
+exports.conn_concur_incr = async function (next, connection) {
     const plugin = this;
     if (!plugin.db) return next();
     if (!plugin.cfg.concurrency) return next();
 
     const dbkey = plugin.get_concurrency_key(connection);
 
-    plugin.db.incr(dbkey, (err, count) => {
-        if (err) {
-            connection.results.add(plugin, { err: `conn_concur_incr:${err}` });
-            return next();
-        }
+    try {
+        const count = await plugin.db.incr(dbkey)
 
         if (isNaN(count)) {
             connection.results.add(plugin, {err: 'conn_concur_incr got isNaN'});
@@ -211,7 +208,11 @@ exports.conn_concur_incr = function (next, connection) {
 
         plugin.db.expire(dbkey, 3 * 60); // 3 minute lifetime
         next();
-    });
+    }
+    catch (err) {
+        connection.results.add(plugin, { err: `conn_concur_incr:${err}` });
+        next();
+    }
 }
 
 exports.get_concurrency_key = function (connection) {
@@ -259,16 +260,19 @@ exports.penalize = function (connection, disconnect, msg, next) {
     }, delay * 1000);
 }
 
-exports.conn_concur_decr = function (next, connection) {
+exports.conn_concur_decr = async function (next, connection) {
     const plugin = this;
     if (!plugin.db) return next();
     if (!plugin.cfg.concurrency) return next();
 
     const dbkey = plugin.get_concurrency_key(connection);
-    plugin.db.incrby(dbkey, -1, (err, concurrent) => {
-        if (err) connection.results.add(plugin, { err: `conn_concur_decr:${err}` })
-        return next();
-    });
+    try {
+        await plugin.db.incrby(dbkey, -1)
+    }
+    catch (err) {
+        connection.results.add(plugin, { err: `conn_concur_decr:${err}` })
+    }
+    next();
 }
 
 exports.get_host_key = function (type, connection, cb) {
@@ -382,7 +386,7 @@ function getTTL (value) {
             ttl *= (60*60*24);  // days
             break;
         default:
-            return;
+            return ttl;
     }
     return ttl;
 }
@@ -393,7 +397,7 @@ function getLimit (value) {
     return parseInt(match[1], 10);
 }
 
-exports.rate_limit = function (connection, key, value, cb) {
+exports.rate_limit = async function (connection, key, value, cb) {
     const plugin = this;
 
     if (value === 0) {     // Limit disabled for this host
@@ -414,26 +418,32 @@ exports.rate_limit = function (connection, key, value, cb) {
 
     connection.logdebug(plugin, `key=${key} limit=${limit} ttl=${ttl}`);
 
-    plugin.db.incr(key, (err, newval) => {
-        if (err) return cb(err);
-
+    try {
+        const newval = await plugin.db.incr(key)
         if (newval === 1) plugin.db.expire(key, ttl);
-        cb(err, parseInt(newval, 10) > limit); // boolean true/false
-    })
+        cb(null, parseInt(newval, 10) > limit); // boolean
+    }
+    catch (err) {
+        cb(err);
+    }
 }
 
 exports.rate_rcpt_host_incr = function (next, connection) {
     const plugin = this;
     if (!plugin.db) return next();
 
-    plugin.get_host_key('rate_rcpt_host', connection, (err, key, value) => {
+    plugin.get_host_key('rate_rcpt_host', connection, async (err, key, value) => {
         if (!key || !value) return next();
 
-        key = `rate_rcpt_host:${key}`;
-        plugin.db.incr(key, (err2, newval) => {
+        try {
+            key = `rate_rcpt_host:${key}`;
+            const newval = await plugin.db.incr(key)
             if (newval === 1) plugin.db.expire(key, getTTL(value));
-            next();
-        })
+        }
+        catch (err2) {
+            connection.results.add(plugin, { err2 })
+        }
+        next();
     })
 }
 
@@ -441,7 +451,7 @@ exports.rate_rcpt_host_enforce = function (next, connection) {
     const plugin = this;
     if (!plugin.db) return next();
 
-    plugin.get_host_key('rate_rcpt_host', connection, (err, key, value) => {
+    plugin.get_host_key('rate_rcpt_host', connection, async (err, key, value) => {
         if (err) {
             connection.results.add(plugin, { err: `rate_rcpt_host:${err}` });
             return next();
@@ -453,11 +463,8 @@ exports.rate_rcpt_host_enforce = function (next, connection) {
         const limit = parseInt(match[0], 10);
         if (!limit) return next();
 
-        plugin.db.get(`rate_rcpt_host:${key}`, (err2, result) => {
-            if (err2) {
-                connection.results.add(plugin, { err: `rate_rcpt_host:${err2}` });
-                return next();
-            }
+        try {
+            const result = await plugin.db.get(`rate_rcpt_host:${key}`)
 
             if (!result) return next();
             connection.results.add(plugin, {
@@ -468,7 +475,11 @@ exports.rate_rcpt_host_enforce = function (next, connection) {
 
             connection.results.add(plugin, { fail: 'rate_rcpt_host' });
             plugin.penalize(connection, false, 'recipient rate limit exceeded', next);
-        });
+        }
+        catch (err2) {
+            connection.results.add(plugin, { err: `rate_rcpt_host:${err2}` });
+            next();
+        }
     });
 }
 
@@ -476,24 +487,27 @@ exports.rate_conn_incr = function (next, connection) {
     const plugin = this;
     if (!plugin.db) return next();
 
-    plugin.get_host_key('rate_conn', connection, (err, key, value) => {
+    plugin.get_host_key('rate_conn', connection, async (err, key, value) => {
         if (!key || !value) return next();
 
-        key = `rate_conn:${key}`;
-        plugin.db.hincrby(key, + new Date(), 1, (err2, newval) => {
-            if (err2) connection.results.add(plugin, { err: err2 });
+        try {
+            await plugin.db.hIncrBy(`rate_conn:${key}`, (+ new Date()).toString(), 1)
             // extend key expiration on every new connection
-            plugin.db.expire(key, getTTL(value) * 2);
-            next();
-        });
-    });
+            await plugin.db.expire(`rate_conn:${key}`, getTTL(value) * 2)
+        }
+        catch (err2) {
+            console.error(err2)
+            connection.results.add(plugin, { err: err2 });
+        }
+        next();
+    })
 }
 
 exports.rate_conn_enforce = function (next, connection) {
     const plugin = this;
     if (!plugin.db) return next();
 
-    plugin.get_host_key('rate_conn', connection, (err, key, value) => {
+    plugin.get_host_key('rate_conn', connection, async (err, key, value) => {
         if (err) {
             connection.results.add(plugin, { err: `rate_conn:${err}` });
             return next();
@@ -507,12 +521,8 @@ exports.rate_conn_enforce = function (next, connection) {
             return next();
         }
 
-        plugin.db.hgetall(`rate_conn:${key}`, (err2, tstamps) => {
-            if (err2) {
-                connection.results.add(plugin, { err: `rate_conn:${err}` });
-                return next();
-            }
-
+        try {
+            const tstamps = await plugin.db.hGetAll(`rate_conn:${key}`)
             if (!tstamps) {
                 connection.results.add(plugin, { err: 'rate_conn:no_tstamps' });
                 return next();
@@ -534,8 +544,12 @@ exports.rate_conn_enforce = function (next, connection) {
             connection.results.add(plugin, { fail: 'rate_conn' });
 
             plugin.penalize(connection, true, 'connection rate limit exceeded', next);
-        });
-    });
+        }
+        catch (err2) {
+            connection.results.add(plugin, { err: `rate_conn:${err}` });
+            next();
+        }
+    })
 }
 
 exports.rate_rcpt_sender = function (next, connection, params) {
@@ -623,19 +637,15 @@ function getOutKey (domain) {
     return `outbound-rate:${domain}`;
 }
 
-exports.outbound_increment = function (next, hmail) {
+exports.outbound_increment = async function (next, hmail) {
     const plugin = this;
     if (!plugin.db) return next();
 
     const outDom = getOutDom(hmail);
     const outKey = getOutKey(outDom);
 
-    plugin.db.hincrby(outKey, 'TOTAL', 1, (err, count) => {
-        if (err) {
-            plugin.logerror(`outbound_increment: ${err}`);
-            return next(); // just deliver
-        }
-
+    try {
+        let count = await plugin.db.hIncrBy(outKey, 'TOTAL', 1)
 
         plugin.db.expire(outKey, 300);  // 5 min expire
 
@@ -648,13 +658,17 @@ exports.outbound_increment = function (next, hmail) {
 
         const delay = plugin.cfg.outbound.delay || 30;
         next(constants.delay, delay);
-    })
+    }
+    catch (err) {
+        plugin.logerror(`outbound_increment: ${err}`);
+        next(); // just deliver
+    }
 }
 
 exports.outbound_decrement = function (next, hmail) {
     const plugin = this;
     if (!plugin.db) return next();
 
-    plugin.db.hincrby(getOutKey(getOutDom(hmail)), 'TOTAL', -1);
-    return next();
+    plugin.db.hIncrBy(getOutKey(getOutDom(hmail)), 'TOTAL', -1);
+    next();
 }

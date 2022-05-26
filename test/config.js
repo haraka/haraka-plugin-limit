@@ -16,7 +16,7 @@ const default_config = {
     rate_rcpt_host: { '127': 0, enabled: false, default: '50/5m' },
     rate_rcpt_sender: { '127': 0, enabled: false, default: '50/5m' },
     rate_rcpt_null: { enabled: false, default: 1 },
-    redis: { db: 4, host: '127.0.0.1', port: '6379' },
+    redis: { db: 4, socket: { host: '127.0.0.1', port: '6379' } },
     concurrency: { plugin: 'karma', good: 10, bad: 1, none: 2 }
 };
 

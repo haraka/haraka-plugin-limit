@@ -105,6 +105,8 @@ describe('rate_limit', function () {
 
 describe('rate_conn', function () {
     beforeEach(function (done) {
+        this.server = { notes: {} };
+
         this.plugin = new fixtures.plugin('rate_limit');
         this.plugin.config = this.plugin.config.module_config(path.resolve('test'));
 
@@ -113,11 +115,10 @@ describe('rate_conn', function () {
         this.connection.remote.host = 'mail.example.com';
 
         this.plugin.register();
-        const server = { notes: {} };
         this.plugin.init_redis_plugin(function () {
             done();
         },
-        server);
+        this.server);
     })
 
     it('default limit', function (done) {
