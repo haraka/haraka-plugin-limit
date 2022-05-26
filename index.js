@@ -396,22 +396,23 @@ function getLimit (value) {
     return parseInt(match[1], 10);
 }
 
-exports.rate_limit = async function (connection, key, value, cb) {
+exports.rate_limit = async function (connection, key, value) {
 
     if (value === 0) {     // Limit disabled for this host
         connection.loginfo(this, `rate limit disabled for: ${key}`);
-        return cb(null, false);
+        return false
     }
 
     // CAUTION: !value would match that 0 value -^
-    if (!key || !value) return cb();
-    if (!this.db) return cb();
+    if (!key || !value) return
+    if (!this.db) return
 
     const limit = getLimit(value);
     const ttl = getTTL(value);
 
     if (!limit || ! ttl) {
-        return cb(new Error(`syntax error: key=${key} value=${value}`));
+        connection.results.add(this, { err: `syntax error: key=${key} value=${value}` });
+        return
     }
 
     connection.logdebug(this, `key=${key} limit=${limit} ttl=${ttl}`);
@@ -419,10 +420,10 @@ exports.rate_limit = async function (connection, key, value, cb) {
     try {
         const newval = await this.db.incr(key)
         if (newval === 1) this.db.expire(key, ttl);
-        cb(null, parseInt(newval, 10) > limit); // boolean
+        return parseInt(newval, 10) > limit // boolean
     }
     catch (err) {
-        cb(err);
+        connection.results.add(this, { err: `${key}:${err}` });
     }
 }
 
@@ -531,69 +532,47 @@ exports.rate_conn_enforce = async function (next, connection) {
     }
 }
 
-exports.rate_rcpt_sender = function (next, connection, params) {
-    const plugin = this;
+exports.rate_rcpt_sender = async function (next, connection, params) {
 
-    const [ key, value ] = plugin.get_mail_key('rate_rcpt_sender', connection.transaction.mail_from)
+    const [ key, value ] = this.get_mail_key('rate_rcpt_sender', connection.transaction.mail_from)
+    connection.results.add(this, { rate_rcpt_sender: value });
 
-    plugin.rate_limit(connection, `rate_rcpt_sender:${key}`, value, (err, over) => {
-        if (err) {
-            connection.results.add(plugin, { err: `rate_rcpt_sender:${err}` });
-            return next();
-        }
+    const over = await this.rate_limit(connection, `rate_rcpt_sender:${key}`, value)
+    if (!over) return next();
 
-        connection.results.add(plugin, { rate_rcpt_sender: value });
-
-        if (!over) return next();
-
-        connection.results.add(plugin, { fail: 'rate_rcpt_sender' });
-        plugin.penalize(connection, false, 'rcpt rate limit exceeded', next);
-    })
+    connection.results.add(this, { fail: 'rate_rcpt_sender' });
+    this.penalize(connection, false, 'rcpt rate limit exceeded', next);
 }
 
-exports.rate_rcpt_null = function (next, connection, params) {
-    const plugin = this;
+exports.rate_rcpt_null = async function (next, connection, params) {
 
     if (!params) return next();
     if (Array.isArray(params)) params = params[0];
     if (params.user) return next();
 
     // Message from the null sender
-    const [ key, value ] = plugin.get_mail_key('rate_rcpt_null', params)
+    const [ key, value ] = this.get_mail_key('rate_rcpt_null', params)
+    connection.results.add(this, { rate_rcpt_null: value });
 
-    plugin.rate_limit(connection, `rate_rcpt_null:${key}`, value, (err, over) => {
-        if (err) {
-            connection.results.add(plugin, { err: `rate_rcpt_null:${err}` });
-            return next();
-        }
+    const over = await this.rate_limit(connection, `rate_rcpt_null:${key}`, value)
+    if (!over) return next();
 
-        connection.results.add(plugin, { rate_rcpt_null: value });
-
-        if (!over) return next();
-
-        connection.results.add(plugin, { fail: 'rate_rcpt_null' });
-        plugin.penalize(connection, false, 'null recip rate limit', next);
-    })
+    connection.results.add(this, { fail: 'rate_rcpt_null' });
+    this.penalize(connection, false, 'null recip rate limit', next);
 }
 
 exports.rate_rcpt = function (next, connection, params) {
     const plugin = this;
     if (Array.isArray(params)) params = params[0];
+
     const [ key, value ] = plugin.get_mail_key('rate_rcpt', params)
+    connection.results.add(plugin, { rate_rcpt: value });
 
-    plugin.rate_limit(connection, `rate_rcpt:${key}`, value, (err, over) => {
-        if (err) {
-            connection.results.add(plugin, { err: `rate_rcpt:${err}` });
-            return next();
-        }
+    const over = plugin.rate_limit(connection, `rate_rcpt:${key}`, value)
+    if (!over) return next();
 
-        connection.results.add(plugin, { rate_rcpt: value });
-
-        if (!over) return next();
-
-        connection.results.add(plugin, { fail: 'rate_rcpt' });
-        plugin.penalize(connection, false, 'rate limit exceeded', next);
-    })
+    connection.results.add(plugin, { fail: 'rate_rcpt' });
+    plugin.penalize(connection, false, 'rate limit exceeded', next);
 }
 
 /*

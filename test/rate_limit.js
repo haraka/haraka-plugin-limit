@@ -70,22 +70,14 @@ describe('rate_limit', function () {
         server);
     })
 
-    it('no limit', function (done) {
-        this.plugin.rate_limit(this.connection, 'key', 0, function (err, is_limited) {
-            // console.log(arguments);
-            assert.equal(err, undefined);
-            assert.equal(is_limited, false);
-            done();
-        })
+    it('no limit', async function () {
+        const is_limited = await this.plugin.rate_limit(this.connection, 'key', 0)
+        assert.equal(is_limited, false);
     })
 
-    it('below 50/5m limit', function (done) {
-        this.plugin.rate_limit(this.connection, 'key', '50/5m', function (err, is_limited) {
-            // console.log(arguments);
-            assert.equal(err, undefined);
-            assert.equal(is_limited, false);
-            done();
-        })
+    it('below 50/5m limit', async function () {
+        const is_limited = await this.plugin.rate_limit(this.connection, 'key', '50/5m')
+        assert.equal(is_limited, false);
     })
 })
 
