@@ -1,6 +1,6 @@
 {
   "name": "haraka-plugin-limit",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "enforce various types of limits on remote MTAs",
   "main": "index.js",
   "directories": {
@@ -8,20 +8,20 @@
   },
   "dependencies": {
     "haraka-constants": "*",
-    "haraka-plugin-redis": "*",
-    "ipaddr.js": "^2.0.0",
-    "redis": "^3.1.1"
+    "haraka-plugin-redis": "2",
+    "ipaddr.js": "^2.0.1",
+    "redis": "4"
   },
   "devDependencies": {
     "address-rfc2821": "*",
-    "eslint": "*",
+    "eslint": "8",
     "eslint-plugin-haraka": "*",
     "haraka-test-fixtures": "*",
-    "mocha": "*"
+    "mocha": "9"
   },
   "scripts": {
-    "lint": "npx eslint *.js test/*.js",
-    "lintfix": "npx eslint --fix *.js test/*.js",
+    "lint": "npx eslint *.js test",
+    "lintfix": "npx eslint --fix *.js test",
     "versions": "npx dependency-version-checker check",
     "test": "npx mocha --exit"
   },
