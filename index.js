@@ -18,7 +18,7 @@ exports.register = function () {
     if (this.cfg.errors.enabled) {
         ['helo','ehlo','mail','rcpt','data'].forEach(hook => {
             this.register_hook(hook, 'max_errors');
-        })
+        });
     }
 
     if (this.cfg.recipients.enabled) {
@@ -561,14 +561,14 @@ exports.rate_rcpt_null = async function (next, connection, params) {
     this.penalize(connection, false, 'null recip rate limit', next);
 }
 
-exports.rate_rcpt = function (next, connection, params) {
+exports.rate_rcpt = async function (next, connection, params) {
     const plugin = this;
     if (Array.isArray(params)) params = params[0];
 
     const [ key, value ] = plugin.get_mail_key('rate_rcpt', params)
     connection.results.add(plugin, { rate_rcpt: value });
 
-    const over = plugin.rate_limit(connection, `rate_rcpt:${key}`, value)
+    const over = await plugin.rate_limit(connection, `rate_rcpt:${key}`, value)
     if (!over) return next();
 
     connection.results.add(plugin, { fail: 'rate_rcpt' });
