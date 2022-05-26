@@ -3,6 +3,7 @@
 
 - dep(eslint): v6 -> v8
 - dep(redis): 3 -> 4
+- ci: add codeql & publish
 
 
 ### 1.0.5 - 2022-03-08
