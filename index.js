@@ -330,13 +330,13 @@ exports.get_host_key = function (type, connection) {
     return [ ip, 0 ]
 }
 
-exports.get_mail_key = function (type, mail, cb) {
-    if (!this.cfg[type] || !mail) return cb();
+exports.get_mail_key = function (type, mail) {
+    if (!this.cfg[type] || !mail) return;
 
     // Full e-mail address (e.g. smf@fsl.com)
     const email = mail.address();
     if (this.cfg[type][email] || this.cfg[type][email] === 0) {
-        return cb(email, this.cfg[type][email]);
+        return [ email, this.cfg[type][email] ]
     }
 
     // RHS parts e.g. host.sub.sub.domain.com
@@ -345,7 +345,7 @@ exports.get_mail_key = function (type, mail, cb) {
         while (rhs_split.length) {
             const part = rhs_split.join('.');
             if (this.cfg[type][part] || this.cfg[type][part] === 0) {
-                return cb(part, this.cfg[type][part]);
+                return [ part, this.cfg[type][part] ]
             }
             rhs_split.pop();
         }
@@ -353,11 +353,11 @@ exports.get_mail_key = function (type, mail, cb) {
 
     // Custom Default
     if (this.cfg[type].default) {
-        return cb(email, this.cfg[type].default);
+        return [ email, this.cfg[type].default ]
     }
 
     // Default 0 = unlimited
-    cb(email, 0);
+    return [ email, 0 ]
 }
 
 function getTTL (value) {
@@ -465,8 +465,8 @@ exports.rate_rcpt_host_enforce = async function (next, connection) {
         connection.results.add(this, { fail: 'rate_rcpt_host' });
         this.penalize(connection, false, 'recipient rate limit exceeded', next);
     }
-    catch (err2) {
-        connection.results.add(this, { err: `rate_rcpt_host:${err2}` });
+    catch (err) {
+        connection.results.add(this, { err: `rate_rcpt_host:${err}` });
         next();
     }
 }
@@ -482,9 +482,9 @@ exports.rate_conn_incr = async function (next, connection) {
         // extend key expiration on every new connection
         await this.db.expire(`rate_conn:${key}`, getTTL(value) * 2)
     }
-    catch (err2) {
-        console.error(err2)
-        connection.results.add(this, { err: err2 });
+    catch (err) {
+        console.error(err)
+        connection.results.add(this, { err });
     }
     next()
 }
@@ -525,7 +525,7 @@ exports.rate_conn_enforce = async function (next, connection) {
 
         this.penalize(connection, true, 'connection rate limit exceeded', next);
     }
-    catch (err2) {
+    catch (err) {
         connection.results.add(this, { err: `rate_conn:${err}` });
         next();
     }
@@ -534,22 +534,21 @@ exports.rate_conn_enforce = async function (next, connection) {
 exports.rate_rcpt_sender = function (next, connection, params) {
     const plugin = this;
 
-    plugin.get_mail_key('rate_rcpt_sender', connection.transaction.mail_from, (key, value) => {
+    const [ key, value ] = plugin.get_mail_key('rate_rcpt_sender', connection.transaction.mail_from)
 
-        plugin.rate_limit(connection, `rate_rcpt_sender:${key}`, value, (err, over) => {
-            if (err) {
-                connection.results.add(plugin, { err: `rate_rcpt_sender:${err}` });
-                return next();
-            }
+    plugin.rate_limit(connection, `rate_rcpt_sender:${key}`, value, (err, over) => {
+        if (err) {
+            connection.results.add(plugin, { err: `rate_rcpt_sender:${err}` });
+            return next();
+        }
 
-            connection.results.add(plugin, { rate_rcpt_sender: value });
+        connection.results.add(plugin, { rate_rcpt_sender: value });
 
-            if (!over) return next();
+        if (!over) return next();
 
-            connection.results.add(plugin, { fail: 'rate_rcpt_sender' });
-            plugin.penalize(connection, false, 'rcpt rate limit exceeded', next);
-        });
-    });
+        connection.results.add(plugin, { fail: 'rate_rcpt_sender' });
+        plugin.penalize(connection, false, 'rcpt rate limit exceeded', next);
+    })
 }
 
 exports.rate_rcpt_null = function (next, connection, params) {
@@ -560,43 +559,41 @@ exports.rate_rcpt_null = function (next, connection, params) {
     if (params.user) return next();
 
     // Message from the null sender
-    plugin.get_mail_key('rate_rcpt_null', params, (key, value) => {
+    const [ key, value ] = plugin.get_mail_key('rate_rcpt_null', params)
 
-        plugin.rate_limit(connection, `rate_rcpt_null:${key}`, value, (err2, over) => {
-            if (err2) {
-                connection.results.add(plugin, { err: `rate_rcpt_null:${err2}` });
-                return next();
-            }
+    plugin.rate_limit(connection, `rate_rcpt_null:${key}`, value, (err, over) => {
+        if (err) {
+            connection.results.add(plugin, { err: `rate_rcpt_null:${err}` });
+            return next();
+        }
 
-            connection.results.add(plugin, { rate_rcpt_null: value });
+        connection.results.add(plugin, { rate_rcpt_null: value });
 
-            if (!over) return next();
+        if (!over) return next();
 
-            connection.results.add(plugin, { fail: 'rate_rcpt_null' });
-            plugin.penalize(connection, false, 'null recip rate limit', next);
-        });
-    });
+        connection.results.add(plugin, { fail: 'rate_rcpt_null' });
+        plugin.penalize(connection, false, 'null recip rate limit', next);
+    })
 }
 
 exports.rate_rcpt = function (next, connection, params) {
     const plugin = this;
     if (Array.isArray(params)) params = params[0];
-    plugin.get_mail_key('rate_rcpt', params, (key, value) => {
+    const [ key, value ] = plugin.get_mail_key('rate_rcpt', params)
 
-        plugin.rate_limit(connection, `rate_rcpt:${key}`, value, (err2, over) => {
-            if (err2) {
-                connection.results.add(plugin, { err: `rate_rcpt:${err2}` });
-                return next();
-            }
+    plugin.rate_limit(connection, `rate_rcpt:${key}`, value, (err, over) => {
+        if (err) {
+            connection.results.add(plugin, { err: `rate_rcpt:${err}` });
+            return next();
+        }
 
-            connection.results.add(plugin, { rate_rcpt: value });
+        connection.results.add(plugin, { rate_rcpt: value });
 
-            if (!over) return next();
+        if (!over) return next();
 
-            connection.results.add(plugin, { fail: 'rate_rcpt' });
-            plugin.penalize(connection, false, 'rate limit exceeded', next);
-        });
-    });
+        connection.results.add(plugin, { fail: 'rate_rcpt' });
+        plugin.penalize(connection, false, 'rate limit exceeded', next);
+    })
 }
 
 /*

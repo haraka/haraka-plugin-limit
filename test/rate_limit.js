@@ -38,29 +38,23 @@ describe('get_mail_key', function () {
         this.plugin.register();
     })
 
-    it('rate_rcpt_sender', function (done) {
-        this.plugin.get_mail_key('rate_rcpt_sender', new Address('<user@example.com>'), function (addr, limit) {
-            // console.log(arguments);
-            assert.equal(addr, 'user@example.com');
-            assert.equal(limit, '50/5m');
-            done();
-        });
+    it('rate_rcpt_sender', function () {
+        const [ addr, limit ] = this.plugin.get_mail_key('rate_rcpt_sender', new Address('<user@example.com>'))
+        // console.log(arguments);
+        assert.equal(addr, 'user@example.com');
+        assert.equal(limit, '50/5m');
     })
-    it('rate_rcpt_null', function (done) {
-        this.plugin.get_mail_key('rate_rcpt_null', new Address('<postmaster>'), function (addr, limit) {
-            // console.log(arguments);
-            assert.equal(addr, 'postmaster');
-            assert.equal(limit, '1');
-            done();
-        });
+    it('rate_rcpt_null', function () {
+        const [ addr, limit ] = this.plugin.get_mail_key('rate_rcpt_null', new Address('<postmaster>'))
+        // console.log(arguments);
+        assert.equal(addr, 'postmaster');
+        assert.equal(limit, '1');
     })
-    it('rate_rcpt', function (done) {
-        this.plugin.get_mail_key('rate_rcpt', new Address('<user@example.com>'), function (addr, limit) {
-            // console.log(arguments);
-            assert.equal(addr, 'user@example.com');
-            assert.equal(limit, '50/5m');
-            done();
-        });
+    it('rate_rcpt', function () {
+        const [ addr, limit ] = this.plugin.get_mail_key('rate_rcpt', new Address('<user@example.com>'))
+        // console.log(arguments);
+        assert.equal(addr, 'user@example.com');
+        assert.equal(limit, '50/5m');
     })
 })
 
