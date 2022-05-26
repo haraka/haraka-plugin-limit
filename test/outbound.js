@@ -8,12 +8,9 @@ const fixtures     = require('haraka-test-fixtures');
 
 function _set_up (done) {
     this.plugin = new fixtures.plugin('index');
-    // gotta inhert b/c config loader merges in defaults from redis.ini
-    // this.plugin.inherits('haraka-plugin-redis');
     this.plugin.register();
     this.server = { notes: {} };
     this.plugin.init_redis_plugin(function () {
-        // console.log(arguments);
         done();
     },
     this.server);

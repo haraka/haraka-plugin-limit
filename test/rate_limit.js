@@ -7,14 +7,13 @@ const Address      = require('address-rfc2821').Address;
 const constants    = require('haraka-constants');
 const fixtures     = require('haraka-test-fixtures');
 
-function setUp (done) {
+function setUp () {
     this.plugin = new fixtures.plugin('rate_limit');
 
     this.connection = new fixtures.connection.createConnection();
     this.connection.remote = { ip: '1.2.3.4', host: 'test.com' };
 
     this.plugin.register();
-    done();
 }
 
 describe('get_host_key', function () {
@@ -39,11 +38,10 @@ describe('get_host_key', function () {
 })
 
 describe('get_mail_key', function () {
-    beforeEach(function (done) {
+    beforeEach(function () {
         this.plugin = new fixtures.plugin('rate_limit');
         this.connection = new fixtures.connection.createConnection();
         this.plugin.register();
-        done();
     })
 
     it('rate_rcpt_sender', function (done) {

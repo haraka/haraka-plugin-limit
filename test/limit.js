@@ -6,7 +6,7 @@ const path         = require('path');
 const constants    = require('haraka-constants');
 const fixtures     = require('haraka-test-fixtures');
 
-function setUp (done) {
+function setUp () {
     this.plugin = new fixtures.plugin('index');
     this.plugin.config = this.plugin.config.module_config(path.resolve('test'));
 
@@ -14,7 +14,6 @@ function setUp (done) {
     this.connection.transaction = new fixtures.transaction.createTransaction();
 
     this.plugin.register();
-    done()
 }
 
 describe('max_errors', function () {
