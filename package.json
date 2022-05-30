@@ -17,7 +17,7 @@
     "eslint": "8",
     "eslint-plugin-haraka": "*",
     "haraka-test-fixtures": "*",
-    "mocha": "9"
+    "mocha": "10"
   },
   "scripts": {
     "lint": "npx eslint *.js test",
