@@ -1,4 +1,14 @@
 
+### Unreleased
+
+### [1.0.7] - 2022-06-03
+
+- chore: add .release as a submodule
+- ci: limit dependabot updates to production deps
+- ci: populate test matrix with Node.js LTS versions
+- cfg: rename redis.db -> redis.database, pi-redis 2+ does this automatically, causing a test failure
+
+
 ### 1.0.6 - 2022-05-25
 
 - feat: update redis commands to be v4 compatible
@@ -36,3 +46,6 @@
 
 - increment rate_conn on connect_init
 - increment rate_rcpt_host on rcpt/rcpt_ok
+
+
+[1.0.7]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.0.7
