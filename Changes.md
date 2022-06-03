@@ -5,6 +5,8 @@
 
 - chore: add .release as a submodule
 - ci: limit dependabot updates to production deps
+- ci: populate test matrix with Node.js LTS versions
+
 
 ### 1.0.6 - 2022-05-25
 
