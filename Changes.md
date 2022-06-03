@@ -1,4 +1,11 @@
 
+### Unreleased
+
+### [1.0.7] - 2022-06-03
+
+- chore: add .release as a submodule
+- ci: limit dependabot updates to production deps
+
 ### 1.0.6 - 2022-05-25
 
 - feat: update redis commands to be v4 compatible
@@ -36,3 +43,6 @@
 
 - increment rate_conn on connect_init
 - increment rate_rcpt_host on rcpt/rcpt_ok
+
+
+[1.0.7]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.0.7
