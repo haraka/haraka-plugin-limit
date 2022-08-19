@@ -36,5 +36,23 @@ jspm_packages
 # Optional REPL history
 .node_repl_history
 
-# Github Actions
+package-lock.json
+bower_components
+# Optional npm cache directory
+.npmrc
+.idea
+.DS_Store
+haraka-update.sh
+
 .github
+.release
+.codeclimate.yml
+.editorconfig
+.gitignore
+.gitmodules
+.lgtm.yml
+appveyor.yml
+codecov.yml
+.travis.yml
+.eslintrc.yaml
+.eslintrc.json

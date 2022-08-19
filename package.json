@@ -1,6 +1,6 @@
 {
   "name": "haraka-plugin-limit",
-  "version": "1.0.7",
+  "version": "1.1.0",
   "description": "enforce various types of limits on remote MTAs",
   "main": "index.js",
   "directories": {
