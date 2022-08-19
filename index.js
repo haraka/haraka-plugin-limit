@@ -10,6 +10,7 @@ exports.register = function () {
     let needs_redis = 0
 
     if (this.cfg.concurrency.enabled) {
+        needs_redis++;
         this.register_hook('connect_init', 'conn_concur_incr');
         this.register_hook('connect',      'check_concurrency');
         this.register_hook('disconnect',   'conn_concur_decr');
@@ -30,25 +31,25 @@ exports.register = function () {
     }
 
     if (this.cfg.rate_conn.enabled) {
-        needs_redis++
+        needs_redis++;
         this.register_hook('connect_init', 'rate_conn_incr');
         this.register_hook('connect',      'rate_conn_enforce');
     }
     if (this.cfg.rate_rcpt_host.enabled) {
-        needs_redis++
+        needs_redis++;
         this.register_hook('connect', 'rate_rcpt_host_enforce');
         this.register_hook('rcpt',    'rate_rcpt_host_incr');
     }
     if (this.cfg.rate_rcpt_sender.enabled) {
-        needs_redis++
+        needs_redis++;
         this.register_hook('rcpt', 'rate_rcpt_sender');
     }
     if (this.cfg.rate_rcpt_null.enabled) {
-        needs_redis++
+        needs_redis++;
         this.register_hook('rcpt', 'rate_rcpt_null');
     }
     if (this.cfg.rate_rcpt.enabled) {
-        needs_redis++
+        needs_redis++;
         this.register_hook('rcpt', 'rate_rcpt');
     }
 
