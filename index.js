@@ -266,7 +266,7 @@ exports.conn_concur_decr = async function (next, connection) {
 
     try {
         const dbkey = this.get_concurrency_key(connection);
-        await this.db.incrby(dbkey, -1)
+        await this.db.incrBy(dbkey, -1)
     }
     catch (err) {
         connection.results.add(this, { err: `conn_concur_decr:${err}` })
