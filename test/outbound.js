@@ -31,7 +31,7 @@ describe('outbound_increment', function () {
     it('limits has delay', function (done) {
         const self = this;
         self.plugin.cfg.outbound['slow.test.com'] = 3;
-        self.plugin.db.hSet('outbound-rate:slow.test.com', 'TOTAL', 4).then(() => {
+        self.plugin.db.hset('outbound-rate:slow.test.com', 'TOTAL', 4).then(() => {
             self.plugin.outbound_increment(function (code, delay) {
                 assert.equal(code, constants.delay);
                 assert.equal(delay, 30);

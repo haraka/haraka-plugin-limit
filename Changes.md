@@ -1,6 +1,9 @@
 
 ### Unreleased
 
+### [1.1.1] - 2023-01-05
+
+- fix redis camel case calls (#47)
 
 ### [1.1.0] - 2022-08-18
 

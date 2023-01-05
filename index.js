@@ -266,7 +266,7 @@ exports.conn_concur_decr = async function (next, connection) {
 
     try {
         const dbkey = this.get_concurrency_key(connection);
-        await this.db.incrBy(dbkey, -1)
+        await this.db.incrby(dbkey, -1)
     }
     catch (err) {
         connection.results.add(this, { err: `conn_concur_decr:${err}` })
@@ -480,7 +480,7 @@ exports.rate_conn_incr = async function (next, connection) {
     if (!key || !value) return next();
 
     try {
-        await this.db.hIncrBy(`rate_conn:${key}`, (+ new Date()).toString(), 1)
+        await this.db.hincrby(`rate_conn:${key}`, (+ new Date()).toString(), 1)
         // extend key expiration on every new connection
         await this.db.expire(`rate_conn:${key}`, getTTL(value) * 2)
     }
@@ -504,7 +504,7 @@ exports.rate_conn_enforce = async function (next, connection) {
     }
 
     try {
-        const tstamps = await this.db.hGetAll(`rate_conn:${key}`)
+        const tstamps = await this.db.hgetall(`rate_conn:${key}`)
         if (!tstamps) {
             connection.results.add(this, { err: 'rate_conn:no_tstamps' });
             return next();
@@ -598,7 +598,7 @@ exports.outbound_increment = async function (next, hmail) {
     const outKey = getOutKey(outDom);
 
     try {
-        let count = await this.db.hIncrBy(outKey, 'TOTAL', 1)
+        let count = await this.db.hincrby(outKey, 'TOTAL', 1)
 
         this.db.expire(outKey, 300);  // 5 min expire
 
@@ -621,6 +621,6 @@ exports.outbound_increment = async function (next, hmail) {
 exports.outbound_decrement = function (next, hmail) {
     if (!this.db) return next();
 
-    this.db.hIncrBy(getOutKey(getOutDom(hmail)), 'TOTAL', -1);
+    this.db.hincrby(getOutKey(getOutDom(hmail)), 'TOTAL', -1);
     next();
 }
