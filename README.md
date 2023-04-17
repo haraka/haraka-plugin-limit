@@ -49,9 +49,9 @@ response to a remote client that has exceeded the rate limits.
 
 Redis is the cluster-safe storage backend for maintaining the counters necessary to impose limits reliably.
 
-- host (default: 127.0.0.1)
-- port (default: 6379)
-- db   (default: 0)
+- host     (default: 127.0.0.1)
+- port     (default: 6379)
+- database (default: 0)
 
 If this [redis] section or any values are missing, the defaults from redis.ini are used.
 
