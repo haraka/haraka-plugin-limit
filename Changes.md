@@ -2,6 +2,11 @@
 ### Unreleased
 
 
+### [1.1.1] - 2022-12-18
+
+- package.json: remove deprecated 'main'
+
+
 ### [1.1.0] - 2022-08-18
 
 - initialize redis when only concurrency is enabled (#42)
@@ -56,3 +61,4 @@
 
 [1.0.7]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.0.7
 [1.1.0]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.1.0
+[1.1.1]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.1.1
