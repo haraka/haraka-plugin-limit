@@ -2,6 +2,7 @@
 
 [![Tests][ci-img]][ci-url]
 [![Code Climate][clim-img]][clim-url]
+
 [![NPM][npm-img]][npm-url]
 
 Apply many types of limits to SMTP connections:
@@ -32,7 +33,7 @@ echo 'limit' >> config/plugins
 
 Each limit type has values that can be defined in [limit.ini](https://github.com/haraka/haraka-plugin-limit/blob/master/config/limit.ini). See the default [limit.ini](https://github.com/haraka/haraka-plugin-limit) in this packages config directory.
 
-Each limit type is disabled until `enabled=true` is set within it's block in limit.ini.
+Each limit type is disabled until `enabled=true` is set within its block in limit.ini.
 
 Haraka's config loader loads the defaults from limit.ini within this plugins installed config directory and applies any overrides found in the limit.ini within your Haraka install/config directory.
 
@@ -41,8 +42,7 @@ Haraka's config loader loads the defaults from limit.ini within this plugins ins
 
 - tarpit_delay = seconds *(optional)*
 
-Set this to the length in seconds that you want to delay every SMTP
-response to a remote client that has exceeded the rate limits.
+Set this to the length in seconds that you want to delay every SMTP response to a remote client that has exceeded the rate limits.
 
 
 ## [redis]
@@ -60,9 +60,7 @@ If this [redis] section or any values are missing, the defaults from redis.ini a
 
 When `[concurrency]max` is defined, it limits the maximum number of simultaneous connections per IP address. Connection attempts in excess of the limit are optionally delayed before being disconnected.
 
-This works well in conjunction with a history / reputation database, so that
-one can assign very low concurrency (1) to bad or unknown senders and higher
-limits for reputable mail servers.
+This works well in conjunction with a history / reputation database, so that one can assign very low concurrency (1) to bad or unknown senders and higher limits for reputable mail servers.
 
 
 ### History
@@ -79,8 +77,7 @@ When `[recipients]max` is defined, each connection is limited to that number of 
 
 When `[unrecognized_commands]max` is set, a connection that exceeeds the limit is disconnected.
 
-Unrecognized commands are normally SMTP verbs invalidly issued by the client.
-Examples:
+Unrecognized commands are normally SMTP verbs invalidly issued by the client. Examples:
 
 * issuing AUTH when we didn't advertise AUTH extension
 * issuing STARTTLS when we didn't advertise STARTTLS
@@ -89,10 +86,7 @@ Examples:
 
 ### Limitations
 
-The unrecognized_command hook is used by the `tls` and `auth` plugins, so
-running this plugin before those would result in valid operations getting
-counted against that connections limits. The solution is simple: list
-`limit` in config/plugins after those.
+The unrecognized_command hook is used by the `tls` and `auth` plugins, so running this plugin before those would result in valid operations getting counted against that connections limits. The solution is simple: list `limit` in config/plugins after those.
 
 
 ## errors

@@ -68,8 +68,7 @@ exports.register = function () {
 }
 
 exports.load_limit_ini = function () {
-    const plugin = this;
-    plugin.cfg = plugin.config.get('limit.ini', {
+    this.cfg = this.config.get('limit.ini', {
         booleans: [
             '-outbound.enabled',
             '-recipients.enabled',
@@ -80,10 +79,13 @@ exports.load_limit_ini = function () {
             '-rate_rcpt_host.enabled',
             '-rate_rcpt_sender.enabled',
             '-rate_rcpt_null.enabled',
+            '-concurrency_history.enabled',
+            '-recipients_history.enabled',
+            '-rate_conn_history.enabled'
         ]
     },
-    function () {
-        plugin.load_limit_ini();
+    () => {
+        this.load_limit_ini();
     });
 
     if (!this.cfg.concurrency) {   // no config file
@@ -144,7 +146,7 @@ exports.max_recipients = function (next, connection, params) {
 exports.get_history_limit = function (type, connection) {
 
     const history_cfg = `${type}_history`;
-    if (!this.cfg[history_cfg]) return;
+    if (!this.cfg[history_cfg] || !this.cfg[history_cfg].enabled) return;
 
     const history_plugin = this.cfg[history_cfg].plugin;
     if (!history_plugin) return;

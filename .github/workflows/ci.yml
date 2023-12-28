@@ -10,36 +10,11 @@ jobs:
   lint:
     uses: haraka/.github/.github/workflows/lint.yml@master
 
-  test:
-    needs: get-lts
-    runs-on: ${{ matrix.os }}
-    services:
-      redis:
-        image: redis
-        ports:
-          - 6379:6379
-    strategy:
-      matrix:
-        os:
-          - ubuntu-latest
-          # - windows-latest  (no redis yet)
-        node-version: ${{ fromJson(needs.get-lts.outputs.active) }}
-      fail-fast: false
-    steps:
-    - uses: actions/checkout@v3
-    - uses: actions/setup-node@v3
-      name: Node ${{ matrix.node-version }} on ${{ matrix.os }}
-      with:
-        node-version: ${{ matrix.node-version }}
-    - run: npm install
-    - run: npm test
+  ubuntu:
+    needs: [ lint ]
+    uses: haraka/.github/.github/workflows/ubuntu.yml@master
 
-  get-lts:
-    needs: lint
-    runs-on: ubuntu-latest
-    steps:
-      - id: get
-        uses: msimerson/node-lts-versions@v1
-    outputs:
-      active: ${{ steps.get.outputs.active }}
-      lts:    ${{ steps.get.outputs.lts }}
+  windows:
+    needs: [ lint ]
+    uses: haraka/.github/.github/workflows/windows.yml@master
+    if: ${{ false }}  # disabled, until Redis for GHA Windows exists
