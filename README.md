@@ -110,16 +110,13 @@ They all use a common configuration format:
 
 - \<lookup\> = \<limit\>[/time[unit]]  *(optional)*
 
-   'lookup' is based upon the limit being enforced and is either an IP
-   address, rDNS name, sender address or recipient address either in full
-   or part.
-   The lookup order is as follows and the first match in this order is
-   returned and is used as the record key in Redis (except for 'default'
-   which always uses the full lookup for that test as the record key):
+'lookup' is based upon the limit being enforced and is either an IP address, rDNS name, sender address or recipient address either in full or part.
 
-   **IPv4/IPv6 address or rDNS hostname:**
+The lookup order is as follows and the first match in this order is returned and is used as the record key in Redis (except for 'default' which always uses the full lookup for that test as the record key):
 
-   <pre>
+**IPv4/IPv6 address or rDNS hostname:**
+
+````
    fe80:0:0:0:202:b3ff:fe1e:8329
    fe80:0:0:0:202:b3ff:fe1e
    fe80:0:0:0:202:b3ff
@@ -137,11 +134,11 @@ They all use a common configuration format:
    domain.com
    com
    default
-   </pre>
+````
 
-   **Sender or Recipient address:**
+**Sender or Recipient address:**
 
-   <pre>
+```
    user@host.sub.part.domain.com
    host.sub.part.domain.com
    sub.part.domain.com
@@ -149,16 +146,13 @@ They all use a common configuration format:
    domain.com
    com
    default
-   </pre>
+````
 
-   In all tests 'default' is used to specify a default limit if nothing else has
-   matched.
+In all tests 'default' is used to specify a default limit if nothing else has matched.
 
-   'limit' specifies the limit for this lookup.  Specify 0 (zero) to disable
-   limits on a matching lookup.
+'limit' specifies the limit for this lookup.  Specify 0 (zero) to disable limits on a matching lookup.
 
-   'time' is optional and if missing defaults to 60 seconds.  You can optionally
-   specify the following time units (case-insensitive):
+'time' is optional and if missing defaults to 60 seconds. You can optionally specify the following time units (case-insensitive):
 
    - s (seconds)
    - m (minutes)
@@ -168,40 +162,35 @@ They all use a common configuration format:
 
 ### [rate_conn]
 
-This section limits the number of connections per interval from a given host
-or set of hosts.
+This section limits the number of connections per interval from a given host or set of hosts.
 
 IP and rDNS names are looked up by this test.
 
 
 ### [rate_rcpt_host]
 
-This section limits the number of recipients per interval from a given host or
-set of hosts.
+This section limits the number of recipients per interval from a given host or set of hosts.
 
 IP and rDNS names are looked up by this test.
 
 
 ### [rate_rcpt_sender]
 
-This section limits the number of recipients per interval from a sender or
-sender domain.
+This section limits the number of recipients per interval from a sender or sender domain.
 
 The sender is looked up by this test.
 
 
 ### [rate_rcpt]
 
-This section limits the rate which a recipient or recipient domain can
-receive messages over an interval.
+This section limits the rate which a recipient or recipient domain can receive messages over an interval.
 
 Each recipient is looked up by this test.
 
 
 ### [rate_rcpt_null]
 
-This section limits the rate at which a recipient can receive messages from
-a null sender (e.g. DSN, MDN etc.) over an interval.
+This section limits the rate at which a recipient can receive messages from a null sender (e.g. DSN, MDN etc.) over an interval.
 
 Each recipient is looked up by this test.
 
