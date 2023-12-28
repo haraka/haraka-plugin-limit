@@ -5,7 +5,7 @@
 ### [1.2.0] - 2023-12-27
 
 - disable history by default (match docs)
-
+- ci: use shared workflows
 
 
 ### [1.1.1] - 2022-12-18

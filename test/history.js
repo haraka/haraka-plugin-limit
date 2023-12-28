@@ -18,6 +18,7 @@ describe('get_history_limit', function () {
         this.plugin.register();
 
         this.plugin.cfg.concurrency_history = {
+            enabled: true,
             plugin: 'karma',
             good: 5,
             bad: 1,

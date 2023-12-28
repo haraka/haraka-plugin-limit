@@ -9,15 +9,18 @@ const default_config = {
     main: { tarpit_delay: 0 },
     outbound: { enabled: false },
     recipients: { enabled: false },
+    recipients_history: { enabled: false },
     unrecognized_commands: { enabled: false },
     errors: { enabled: false },
     rate_conn: { '127': 0, enabled: false, default: 5 },
+    rate_conn_history: { enabled: false },
     rate_rcpt: { '127': 0, enabled: false, default: '50/5m' },
     rate_rcpt_host: { '127': 0, enabled: false, default: '50/5m' },
     rate_rcpt_sender: { '127': 0, enabled: false, default: '50/5m' },
     rate_rcpt_null: { enabled: false, default: 1 },
     redis: { database: 4, socket: { host: '127.0.0.1', port: '6379' } },
-    concurrency: { plugin: 'karma', good: 10, bad: 1, none: 2 }
+    concurrency: { plugin: 'karma', good: 10, bad: 1, none: 2 },
+    concurrency_history: { enabled: false },
 };
 
 describe('plugin_setup', function () {
