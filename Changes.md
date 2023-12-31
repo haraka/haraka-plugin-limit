@@ -2,6 +2,12 @@
 ### Unreleased
 
 
+### [1.2.0] - 2023-12-27
+
+- disable history by default (match docs)
+- ci: use shared workflows
+
+
 ### [1.1.1] - 2022-12-18
 
 - package.json: remove deprecated 'main'
@@ -62,3 +68,4 @@
 [1.0.7]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.0.7
 [1.1.0]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.1.0
 [1.1.1]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.1.1
+[1.2.0]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.2.0

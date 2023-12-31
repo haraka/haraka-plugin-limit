@@ -2,6 +2,7 @@
 
 [![Tests][ci-img]][ci-url]
 [![Code Climate][clim-img]][clim-url]
+
 [![NPM][npm-img]][npm-url]
 
 Apply many types of limits to SMTP connections:
@@ -32,7 +33,7 @@ echo 'limit' >> config/plugins
 
 Each limit type has values that can be defined in [limit.ini](https://github.com/haraka/haraka-plugin-limit/blob/master/config/limit.ini). See the default [limit.ini](https://github.com/haraka/haraka-plugin-limit) in this packages config directory.
 
-Each limit type is disabled until `enabled=true` is set within it's block in limit.ini.
+Each limit type is disabled until `enabled=true` is set within its block in limit.ini.
 
 Haraka's config loader loads the defaults from limit.ini within this plugins installed config directory and applies any overrides found in the limit.ini within your Haraka install/config directory.
 
@@ -41,8 +42,7 @@ Haraka's config loader loads the defaults from limit.ini within this plugins ins
 
 - tarpit_delay = seconds *(optional)*
 
-Set this to the length in seconds that you want to delay every SMTP
-response to a remote client that has exceeded the rate limits.
+Set this to the length in seconds that you want to delay every SMTP response to a remote client that has exceeded the rate limits.
 
 
 ## [redis]
@@ -60,9 +60,7 @@ If this [redis] section or any values are missing, the defaults from redis.ini a
 
 When `[concurrency]max` is defined, it limits the maximum number of simultaneous connections per IP address. Connection attempts in excess of the limit are optionally delayed before being disconnected.
 
-This works well in conjunction with a history / reputation database, so that
-one can assign very low concurrency (1) to bad or unknown senders and higher
-limits for reputable mail servers.
+This works well in conjunction with a history / reputation database, so that one can assign very low concurrency (1) to bad or unknown senders and higher limits for reputable mail servers.
 
 
 ### History
@@ -79,8 +77,7 @@ When `[recipients]max` is defined, each connection is limited to that number of 
 
 When `[unrecognized_commands]max` is set, a connection that exceeeds the limit is disconnected.
 
-Unrecognized commands are normally SMTP verbs invalidly issued by the client.
-Examples:
+Unrecognized commands are normally SMTP verbs invalidly issued by the client. Examples:
 
 * issuing AUTH when we didn't advertise AUTH extension
 * issuing STARTTLS when we didn't advertise STARTTLS
@@ -89,10 +86,7 @@ Examples:
 
 ### Limitations
 
-The unrecognized_command hook is used by the `tls` and `auth` plugins, so
-running this plugin before those would result in valid operations getting
-counted against that connections limits. The solution is simple: list
-`limit` in config/plugins after those.
+The unrecognized_command hook is used by the `tls` and `auth` plugins, so running this plugin before those would result in valid operations getting counted against that connections limits. The solution is simple: list `limit` in config/plugins after those.
 
 
 ## errors
@@ -116,16 +110,13 @@ They all use a common configuration format:
 
 - \<lookup\> = \<limit\>[/time[unit]]  *(optional)*
 
-   'lookup' is based upon the limit being enforced and is either an IP
-   address, rDNS name, sender address or recipient address either in full
-   or part.
-   The lookup order is as follows and the first match in this order is
-   returned and is used as the record key in Redis (except for 'default'
-   which always uses the full lookup for that test as the record key):
+'lookup' is based upon the limit being enforced and is either an IP address, rDNS name, sender address or recipient address either in full or part.
 
-   **IPv4/IPv6 address or rDNS hostname:**
+The lookup order is as follows and the first match in this order is returned and is used as the record key in Redis (except for 'default' which always uses the full lookup for that test as the record key):
 
-   <pre>
+**IPv4/IPv6 address or rDNS hostname:**
+
+````
    fe80:0:0:0:202:b3ff:fe1e:8329
    fe80:0:0:0:202:b3ff:fe1e
    fe80:0:0:0:202:b3ff
@@ -143,11 +134,11 @@ They all use a common configuration format:
    domain.com
    com
    default
-   </pre>
+````
 
-   **Sender or Recipient address:**
+**Sender or Recipient address:**
 
-   <pre>
+```
    user@host.sub.part.domain.com
    host.sub.part.domain.com
    sub.part.domain.com
@@ -155,16 +146,13 @@ They all use a common configuration format:
    domain.com
    com
    default
-   </pre>
+````
 
-   In all tests 'default' is used to specify a default limit if nothing else has
-   matched.
+In all tests 'default' is used to specify a default limit if nothing else has matched.
 
-   'limit' specifies the limit for this lookup.  Specify 0 (zero) to disable
-   limits on a matching lookup.
+'limit' specifies the limit for this lookup.  Specify 0 (zero) to disable limits on a matching lookup.
 
-   'time' is optional and if missing defaults to 60 seconds.  You can optionally
-   specify the following time units (case-insensitive):
+'time' is optional and if missing defaults to 60 seconds. You can optionally specify the following time units (case-insensitive):
 
    - s (seconds)
    - m (minutes)
@@ -174,40 +162,35 @@ They all use a common configuration format:
 
 ### [rate_conn]
 
-This section limits the number of connections per interval from a given host
-or set of hosts.
+This section limits the number of connections per interval from a given host or set of hosts.
 
 IP and rDNS names are looked up by this test.
 
 
 ### [rate_rcpt_host]
 
-This section limits the number of recipients per interval from a given host or
-set of hosts.
+This section limits the number of recipients per interval from a given host or set of hosts.
 
 IP and rDNS names are looked up by this test.
 
 
 ### [rate_rcpt_sender]
 
-This section limits the number of recipients per interval from a sender or
-sender domain.
+This section limits the number of recipients per interval from a sender or sender domain.
 
 The sender is looked up by this test.
 
 
 ### [rate_rcpt]
 
-This section limits the rate which a recipient or recipient domain can
-receive messages over an interval.
+This section limits the rate which a recipient or recipient domain can receive messages over an interval.
 
 Each recipient is looked up by this test.
 
 
 ### [rate_rcpt_null]
 
-This section limits the rate at which a recipient can receive messages from
-a null sender (e.g. DSN, MDN etc.) over an interval.
+This section limits the rate at which a recipient can receive messages from a null sender (e.g. DSN, MDN etc.) over an interval.
 
 Each recipient is looked up by this test.
 
