@@ -2,6 +2,12 @@
 ### Unreleased
 
 
+### [1.2.1] - 2024-03-20
+
+- deps: bump versions
+- fix: undo increment if the email sending is delayed (#56)
+
+
 ### [1.2.0] - 2023-12-27
 
 - disable history by default (match docs)
@@ -69,3 +75,4 @@
 [1.1.0]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.1.0
 [1.1.1]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.1.1
 [1.2.0]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.2.0
+[1.2.1]: https://github.com/haraka/haraka-plugin-limit/releases/tag/1.2.1
