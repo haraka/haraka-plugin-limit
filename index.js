@@ -611,6 +611,7 @@ exports.outbound_increment = async function (next, hmail) {
         count = parseInt(count, 10);
         if (count <= limit) return next();
 
+        this.db.hIncrBy(outKey, 'TOTAL', -1);  // undo the increment
         const delay = this.cfg.outbound.delay || 30;
         next(constants.delay, delay);
     }
