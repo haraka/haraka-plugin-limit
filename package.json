@@ -1,27 +1,33 @@
 {
   "name": "haraka-plugin-limit",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "enforce various types of limits on remote MTAs",
+  "files": [
+    "config"
+  ],
   "directories": {
     "test": "test"
   },
   "dependencies": {
-    "haraka-constants": "1.0.6",
-    "haraka-plugin-redis": "^2.0.6",
-    "ipaddr.js": "^2.1.0",
+    "haraka-constants": "^1.0.6",
+    "haraka-plugin-redis": "^2.0.7",
+    "ipaddr.js": "^2.2.0",
     "redis": "^4.6.13"
   },
   "devDependencies": {
-    "address-rfc2821": "2.1.2",
-    "eslint-plugin-haraka": "1.0.15",
-    "haraka-test-fixtures": "1.3.3",
-    "mocha": "^10.3.0"
+    "address-rfc2821": "^2.1.2",
+    "@haraka/eslint-config": "^1.1.5",
+    "haraka-test-fixtures": "^1.3.7"
   },
   "scripts": {
-    "lint": "npx eslint *.js test",
-    "lintfix": "npx eslint --fix *.js test",
+    "format": "npm run prettier:fix && npm run lint:fix",
+    "lint": "npx eslint@^8 *.js test",
+    "lint:fix": "npx eslint@^8 *.js test --fix",
+    "prettier": "npx prettier . --check",
+    "prettier:fix": "npx prettier . --write --log-level=warn",
+    "test": "npx mocha@10 --exit",
     "versions": "npx dependency-version-checker check",
-    "test": "npx mocha --exit"
+    "versions:fix": "npx dependency-version-checker update && npm run prettier:fix"
   },
   "repository": {
     "type": "git",

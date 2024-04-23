@@ -19,7 +19,6 @@ Apply many types of limits to SMTP connections:
             - by sender
         - max null recipients / period
 
-
 ## Installation
 
 ```sh
@@ -37,13 +36,12 @@ Each limit type is disabled until `enabled=true` is set within its block in limi
 
 Haraka's config loader loads the defaults from limit.ini within this plugins installed config directory and applies any overrides found in the limit.ini within your Haraka install/config directory.
 
-
 ### [main]
 
-- tarpit_delay = seconds *(optional)*
+<!-- prettier-ignore -->
+- tarpit_delay = seconds _(optional)_
 
 Set this to the length in seconds that you want to delay every SMTP response to a remote client that has exceeded the rate limits.
-
 
 ## [redis]
 
@@ -51,10 +49,9 @@ Redis is the cluster-safe storage backend for maintaining the counters necessary
 
 - host (default: 127.0.0.1)
 - port (default: 6379)
-- db   (default: 0)
+- db (default: 0)
 
 If this [redis] section or any values are missing, the defaults from redis.ini are used.
-
 
 ## concurrency
 
@@ -62,16 +59,13 @@ When `[concurrency]max` is defined, it limits the maximum number of simultaneous
 
 This works well in conjunction with a history / reputation database, so that one can assign very low concurrency (1) to bad or unknown senders and higher limits for reputable mail servers.
 
-
 ### History
 
 History: when enabled, the `history` setting is the name of a plugin that stores IP history / reputation results. The result store must have a positive value for good connections and negative integers for poor / undesirable connections. Karma is one such plugin.
 
-
 ## recipients
 
 When `[recipients]max` is defined, each connection is limited to that number of recipients. The limit is imposed against **all** recipient attempts. Attempts in excess of the limit are issued a temporary failure.
-
 
 ## unrecognized_commands
 
@@ -79,25 +73,21 @@ When `[unrecognized_commands]max` is set, a connection that exceeeds the limit i
 
 Unrecognized commands are normally SMTP verbs invalidly issued by the client. Examples:
 
-* issuing AUTH when we didn't advertise AUTH extension
-* issuing STARTTLS when we didn't advertise STARTTLS
-* invalid SMTP verbs
-
+- issuing AUTH when we didn't advertise AUTH extension
+- issuing STARTTLS when we didn't advertise STARTTLS
+- invalid SMTP verbs
 
 ### Limitations
 
 The unrecognized_command hook is used by the `tls` and `auth` plugins, so running this plugin before those would result in valid operations getting counted against that connections limits. The solution is simple: list `limit` in config/plugins after those.
 
-
 ## errors
 
 When `[errors]max` is set, a connection that exceeeds the limit is disconnected. Errors that count against this limit include:
 
-* issuing commands out of turn (MAIL before EHLO, RCPT before MAIL, etc)
-* attempting MAIL on port 465/587 without AUTH
-* MAIL or RCPT addresses that fail to parse
-
-
+- issuing commands out of turn (MAIL before EHLO, RCPT before MAIL, etc)
+- attempting MAIL on port 465/587 without AUTH
+- MAIL or RCPT addresses that fail to parse
 
 # Rate Limits
 
@@ -108,7 +98,7 @@ Missing sections disable that particular test.
 
 They all use a common configuration format:
 
-- \<lookup\> = \<limit\>[/time[unit]]  *(optional)*
+- \<lookup\> = \<limit\>[/time[unit]] _(optional)_
 
 'lookup' is based upon the limit being enforced and is either an IP address, rDNS name, sender address or recipient address either in full or part.
 
@@ -116,7 +106,7 @@ The lookup order is as follows and the first match in this order is returned and
 
 **IPv4/IPv6 address or rDNS hostname:**
 
-````
+```
    fe80:0:0:0:202:b3ff:fe1e:8329
    fe80:0:0:0:202:b3ff:fe1e
    fe80:0:0:0:202:b3ff
@@ -134,7 +124,7 @@ The lookup order is as follows and the first match in this order is returned and
    domain.com
    com
    default
-````
+```
 
 **Sender or Recipient address:**
 
@@ -146,19 +136,18 @@ The lookup order is as follows and the first match in this order is returned and
    domain.com
    com
    default
-````
+```
 
 In all tests 'default' is used to specify a default limit if nothing else has matched.
 
-'limit' specifies the limit for this lookup.  Specify 0 (zero) to disable limits on a matching lookup.
+'limit' specifies the limit for this lookup. Specify 0 (zero) to disable limits on a matching lookup.
 
 'time' is optional and if missing defaults to 60 seconds. You can optionally specify the following time units (case-insensitive):
 
-   - s (seconds)
-   - m (minutes)
-   - h (hours)
-   - d (days)
-
+- s (seconds)
+- m (minutes)
+- h (hours)
+- d (days)
 
 ### [rate_conn]
 
@@ -166,13 +155,11 @@ This section limits the number of connections per interval from a given host or 
 
 IP and rDNS names are looked up by this test.
 
-
 ### [rate_rcpt_host]
 
 This section limits the number of recipients per interval from a given host or set of hosts.
 
 IP and rDNS names are looked up by this test.
-
 
 ### [rate_rcpt_sender]
 
@@ -180,20 +167,17 @@ This section limits the number of recipients per interval from a sender or sende
 
 The sender is looked up by this test.
 
-
 ### [rate_rcpt]
 
 This section limits the rate which a recipient or recipient domain can receive messages over an interval.
 
 Each recipient is looked up by this test.
 
-
 ### [rate_rcpt_null]
 
 This section limits the rate at which a recipient can receive messages from a null sender (e.g. DSN, MDN etc.) over an interval.
 
 Each recipient is looked up by this test.
-
 
 ### [outbound]
 
@@ -205,7 +189,6 @@ The number after the domain is the maximum concurrency limit for that domain.
 
 Delay is the number of seconds to wait before retrying this message. Outbound concurrency is checked on every attempt to deliver.
 
-
 ## CAUTION
 
 Applying strict connection and rate limits is an effective way to reduce spam delivery. It's also an effective way to inflict a stampeding herd on your mail server. When spam/malware is delivered by MTAs that have queue retries, if you disconnect early (which the rate limits do) with a 400 series code (a sane default), the remote is likely to try again. And again. And again. And again. This can cause an obscene rise in the number of connections your mail server handles. Plan a strategy for handling that.
@@ -214,7 +197,6 @@ Applying strict connection and rate limits is an effective way to reduce spam de
 
 - Don't enforce limits early. I use karma and wait until DATA before disconnecting. By then, the score of the connection is determinate and I can return a 500 series code telling the remote not to try again.
 - enforce rate limits with your firewall instead
-
 
 [ci-img]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci.yml/badge.svg
 [ci-url]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci.yml
