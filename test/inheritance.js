@@ -1,4 +1,3 @@
-
 const assert = require('assert')
 
 const fixtures = require('haraka-test-fixtures')
