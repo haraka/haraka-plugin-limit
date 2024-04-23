@@ -1,4 +1,3 @@
-
 const assert = require('assert')
 
 // var Address      = require('address-rfc2821').Address;

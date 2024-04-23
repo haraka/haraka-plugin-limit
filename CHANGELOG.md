@@ -4,9 +4,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
+### [1.2.3] - 2024-04-23
+
+- fix: added `[main]` property to package.json. Fixes #61
+
 ### [1.2.2] - 2024-04-22
 
-- populate [files] in package.json. Delete .npmignore.
+- populate [files] in package.json. Delete .npmignore. #60
 - dep: eslint-plugin-haraka -> @haraka/eslint-config
 - lint: remove duplicate / stale rules from .eslintrc
 - deps: bump versions
@@ -77,3 +81,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 [1.2.0]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.0
 [1.2.1]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.1
 [1.2.2]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.2
+[1.2.3]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.3
