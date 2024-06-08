@@ -511,7 +511,7 @@ exports.rate_conn_enforce = async function (next, connection) {
 
     let connections_in_ttl_period = 0
     for (const ts of Object.keys(tstamps)) {
-      if (parseInt(ts, 10) < periodStartTs) return // older than ttl
+      if (parseInt(ts, 10) < periodStartTs) continue // older than ttl
       connections_in_ttl_period =
         connections_in_ttl_period + parseInt(tstamps[ts], 10)
     }
