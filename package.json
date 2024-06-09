@@ -1,6 +1,6 @@
 {
   "name": "haraka-plugin-limit",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "enforce various types of limits on remote MTAs",
   "main": "index.js",
   "files": [
@@ -10,10 +10,10 @@
     "test": "test"
   },
   "dependencies": {
-    "haraka-constants": "^1.0.6",
+    "haraka-constants": "^1.0.7",
     "haraka-plugin-redis": "^2.0.7",
     "ipaddr.js": "^2.2.0",
-    "redis": "^4.6.13"
+    "redis": "^4.6.14"
   },
   "devDependencies": {
     "address-rfc2821": "^2.1.2",
