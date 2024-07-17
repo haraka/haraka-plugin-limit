@@ -480,7 +480,6 @@ exports.rate_conn_incr = async function (next, connection) {
     // extend key expiration on every new connection
     await this.db.expire(`rate_conn:${key}`, getTTL(value) * 2)
   } catch (err) {
-    console.error(err)
     connection.results.add(this, { err })
   }
   next()
@@ -511,8 +510,9 @@ exports.rate_conn_enforce = async function (next, connection) {
 
     let connections_in_ttl_period = 0
     for (const ts of Object.keys(tstamps)) {
-      if (parseInt(ts, 10) < periodStartTs) { // older than ttl
-        this.db.hDel(`rate_conn:${key}`, ts);
+      if (parseInt(ts, 10) < periodStartTs) {
+        // older than ttl
+        this.db.hDel(`rate_conn:${key}`, ts)
         continue
       }
       connections_in_ttl_period =

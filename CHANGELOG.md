@@ -4,6 +4,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
+### [1.2.5] - 2024-07-16
+
+- fix: remove expired rate_conn hash keys (#66)
+
 ### [1.2.4] - 2024-06-09
 
 - Fix max_recipients loop iterator (introduced in 2c5fdd49) #63
@@ -87,3 +91,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 [1.2.2]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.2
 [1.2.3]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.3
 [1.2.4]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.4
+[1.2.5]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.5
