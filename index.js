@@ -480,7 +480,6 @@ exports.rate_conn_incr = async function (next, connection) {
     // extend key expiration on every new connection
     await this.db.expire(`rate_conn:${key}`, getTTL(value) * 2)
   } catch (err) {
-    console.error(err)
     connection.results.add(this, { err })
   }
   next()
