@@ -515,7 +515,7 @@ exports.rate_conn_enforce = async function (next, connection) {
         this.db.hDel(`rate_conn:${key}`, ts);
         continue
       }
-        connections_in_ttl_period =
+      connections_in_ttl_period =
         connections_in_ttl_period + parseInt(tstamps[ts], 10)
     }
     connection.results.add(this, {
