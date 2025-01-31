@@ -17,13 +17,13 @@
   },
   "devDependencies": {
     "address-rfc2821": "^2.1.2",
-    "@haraka/eslint-config": "^1.1.5",
+    "@haraka/eslint-config": "^2.0.2",
     "haraka-test-fixtures": "^1.3.7"
   },
   "scripts": {
     "format": "npm run prettier:fix && npm run lint:fix",
-    "lint": "npx eslint@^8 *.js test",
-    "lint:fix": "npx eslint@^8 *.js test --fix",
+    "lint": "npx eslint@^9 *.js test",
+    "lint:fix": "npx eslint@^9 *.js test --fix",
     "prettier": "npx prettier . --check",
     "prettier:fix": "npx prettier . --write --log-level=warn",
     "test": "npx mocha@11 --exit",
@@ -45,5 +45,9 @@
   "bugs": {
     "url": "https://github.com/haraka/haraka-plugin-limit/issues"
   },
-  "homepage": "https://github.com/haraka/haraka-plugin-limit#readme"
+  "homepage": "https://github.com/haraka/haraka-plugin-limit#readme",
+  "prettier": {
+    "singleQuote": true,
+    "semi": false
+  }
 }

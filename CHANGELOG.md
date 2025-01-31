@@ -6,18 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### [1.2.6] - 2025-01-31
 
-#### Added
-
-- 
-
-#### Fixed
-
-- 
-
-#### Changed
-
-- 
-
+- doc(CONTRIBUTORS): updated
+- dep(eslint): upgrade to v9
 
 ### [1.2.5] - 2024-07-16
 
