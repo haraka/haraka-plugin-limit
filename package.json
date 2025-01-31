@@ -1,6 +1,6 @@
 {
   "name": "haraka-plugin-limit",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "enforce various types of limits on remote MTAs",
   "main": "index.js",
   "files": [
@@ -26,7 +26,7 @@
     "lint:fix": "npx eslint@^8 *.js test --fix",
     "prettier": "npx prettier . --check",
     "prettier:fix": "npx prettier . --write --log-level=warn",
-    "test": "npx mocha@10 --exit",
+    "test": "npx mocha@11 --exit",
     "versions": "npx dependency-version-checker check",
     "versions:fix": "npx dependency-version-checker update && npm run prettier:fix"
   },
