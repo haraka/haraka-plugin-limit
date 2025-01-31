@@ -3,8 +3,6 @@
 [![Tests][ci-img]][ci-url]
 [![Code Climate][clim-img]][clim-url]
 
-[![NPM][npm-img]][npm-url]
-
 Apply many types of limits to SMTP connections:
 
     - concurrent connections
@@ -202,5 +200,3 @@ Applying strict connection and rate limits is an effective way to reduce spam de
 [ci-url]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci.yml
 [clim-img]: https://codeclimate.com/github/haraka/haraka-plugin-limit/badges/gpa.svg
 [clim-url]: https://codeclimate.com/github/haraka/haraka-plugin-limit
-[npm-img]: https://img.shields.io/npm/dm/haraka-plugin-limit
-[npm-url]: https://www.npmjs.com/package/haraka-plugin-limit

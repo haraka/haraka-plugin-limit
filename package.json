@@ -1,6 +1,6 @@
 {
   "name": "haraka-plugin-limit",
-  "version": "1.2.5",
+  "version": "1.2.6",
   "description": "enforce various types of limits on remote MTAs",
   "main": "index.js",
   "files": [
@@ -11,22 +11,22 @@
   },
   "dependencies": {
     "haraka-constants": "^1.0.7",
-    "haraka-plugin-redis": "^2.0.7",
+    "haraka-plugin-redis": "^2.0.9",
     "ipaddr.js": "^2.2.0",
-    "redis": "^4.6.14"
+    "redis": "^4.7.0"
   },
   "devDependencies": {
     "address-rfc2821": "^2.1.2",
-    "@haraka/eslint-config": "^1.1.5",
-    "haraka-test-fixtures": "^1.3.7"
+    "@haraka/eslint-config": "^2.0.2",
+    "haraka-test-fixtures": "^1.3.8"
   },
   "scripts": {
     "format": "npm run prettier:fix && npm run lint:fix",
-    "lint": "npx eslint@^8 *.js test",
-    "lint:fix": "npx eslint@^8 *.js test --fix",
+    "lint": "npx eslint@^9 *.js test",
+    "lint:fix": "npx eslint@^9 *.js test --fix",
     "prettier": "npx prettier . --check",
     "prettier:fix": "npx prettier . --write --log-level=warn",
-    "test": "npx mocha@10 --exit",
+    "test": "npx mocha@11 --exit",
     "versions": "npx dependency-version-checker check",
     "versions:fix": "npx dependency-version-checker update && npm run prettier:fix"
   },
@@ -45,5 +45,9 @@
   "bugs": {
     "url": "https://github.com/haraka/haraka-plugin-limit/issues"
   },
-  "homepage": "https://github.com/haraka/haraka-plugin-limit#readme"
+  "homepage": "https://github.com/haraka/haraka-plugin-limit#readme",
+  "prettier": {
+    "singleQuote": true,
+    "semi": false
+  }
 }
