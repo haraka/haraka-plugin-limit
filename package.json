@@ -13,7 +13,7 @@
     "haraka-constants": "^1.0.7",
     "haraka-plugin-redis": "^2.0.9",
     "ipaddr.js": "^2.2.0",
-    "redis": "^4.7.0"
+    "redis": "^5.1.0"
   },
   "devDependencies": {
     "address-rfc2821": "^2.1.2",
