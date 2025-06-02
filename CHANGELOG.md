@@ -4,6 +4,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
+### [1.2.7] - 2025-06-02
+
+- deps: bump versions
+- dep(redis): remove, we get it via dep on h-p-redis
+
 ### [1.2.6] - 2025-01-31
 
 - prettier: move config into package.json
@@ -100,3 +105,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 [1.2.4]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.4
 [1.2.5]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.5
 [1.2.6]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.6
+[1.2.7]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.7
