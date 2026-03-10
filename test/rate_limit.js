@@ -111,54 +111,58 @@ describe('rate_conn', function () {
     }, this.server)
   })
 
-  it('default limit', function (done) {
+  it('default limit', async function () {
     const plugin = this.plugin
     const connection = this.connection
 
-    plugin.rate_conn_incr(function () {
-      plugin.rate_conn_enforce(
-        function (code, msg) {
-          const rc = connection.results.get(plugin.name)
-          assert.ok(rc.rate_conn)
+    await new Promise((resolve) => {
+      plugin.rate_conn_incr(function () {
+        plugin.rate_conn_enforce(
+          function (code, msg) {
+            const rc = connection.results.get(plugin.name)
+            assert.ok(rc.rate_conn)
 
-          const match = /([\d]+):(.*)$/.exec(rc.rate_conn) // 1/5
+            const match = /([\d]+):(.*)$/.exec(rc.rate_conn) // 1/5
 
-          if (parseInt(match[1]) <= parseInt(match[2])) {
-            assert.equal(code, undefined)
-            assert.equal(msg, undefined)
-          } else {
-            assert.equal(code, constants.DENYSOFTDISCONNECT)
-            assert.equal(msg, 'connection rate limit exceeded')
-          }
-          done()
-        }.bind(this),
-        connection,
-      )
-    }, connection)
+            if (parseInt(match[1]) <= parseInt(match[2])) {
+              assert.equal(code, undefined)
+              assert.equal(msg, undefined)
+            } else {
+              assert.equal(code, constants.DENYSOFTDISCONNECT)
+              assert.equal(msg, 'connection rate limit exceeded')
+            }
+            resolve()
+          }.bind(this),
+          connection,
+        )
+      }, connection)
+    })
   })
 
-  it('defined limit', function (done) {
+  it('defined limit', async function () {
     const plugin = this.plugin
     const connection = this.connection
     plugin.cfg.rate_conn['1.2.3.4'] = '1/5m'
 
-    plugin.rate_conn_incr(function () {
-      plugin.rate_conn_enforce(
-        function (code, msg) {
-          const rc = connection.results.get(plugin.name)
-          assert.ok(rc.rate_conn)
-          const match = /^([\d]+):(.*)$/.exec(rc.rate_conn) // 1/5m
-          if (parseInt(match[1]) <= parseInt(match[2])) {
-            assert.equal(code, undefined)
-            assert.equal(msg, undefined)
-          } else {
-            assert.equal(code, constants.DENYSOFTDISCONNECT)
-            assert.equal(msg, 'connection rate limit exceeded')
-          }
-          done()
-        }.bind(this),
-        connection,
-      )
-    }, connection)
+    await new Promise((resolve) => {
+      plugin.rate_conn_incr(function () {
+        plugin.rate_conn_enforce(
+          function (code, msg) {
+            const rc = connection.results.get(plugin.name)
+            assert.ok(rc.rate_conn)
+            const match = /^([\d]+):(.*)$/.exec(rc.rate_conn) // 1/5m
+            if (parseInt(match[1]) <= parseInt(match[2])) {
+              assert.equal(code, undefined)
+              assert.equal(msg, undefined)
+            } else {
+              assert.equal(code, constants.DENYSOFTDISCONNECT)
+              assert.equal(msg, 'connection rate limit exceeded')
+            }
+            resolve()
+          }.bind(this),
+          connection,
+        )
+      }, connection)
+    })
   })
 })
