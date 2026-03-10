@@ -16,26 +16,29 @@ function _set_up(done) {
 describe('outbound_increment', function () {
   before(_set_up)
 
-  it('no limit, no delay', function (done) {
-    this.plugin.outbound_increment(
-      function (code, msg) {
-        assert.equal(code, undefined)
-        assert.equal(msg, undefined)
-        done()
-      },
-      { domain: 'test.com' },
-    )
+  it('no limit, no delay', async function () {
+    await new Promise((resolve) => {
+      this.plugin.outbound_increment(
+        function (code, msg) {
+          assert.equal(code, undefined)
+          assert.equal(msg, undefined)
+          resolve()
+        },
+        { domain: 'test.com' },
+      )
+    })
   })
 
-  it('limits has delay', function (done) {
+  it('limits has delay', async function () {
     const self = this
     self.plugin.cfg.outbound['slow.test.com'] = 3
-    self.plugin.db.hSet('outbound-rate:slow.test.com', 'TOTAL', 4).then(() => {
+    await self.plugin.db.hSet('outbound-rate:slow.test.com', 'TOTAL', 4)
+    await new Promise((resolve) => {
       self.plugin.outbound_increment(
         function (code, delay) {
           assert.equal(code, constants.delay)
           assert.equal(delay, 30)
-          done()
+          resolve()
         },
         { domain: 'slow.test.com' },
       )
