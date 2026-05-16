@@ -3,6 +3,8 @@ const assert = require('assert')
 const path = require('path')
 const fixtures = require('haraka-test-fixtures')
 
+const { bare } = require('./helpers')
+
 const default_config = {
   main: { tarpit_delay: 0 },
   outbound: { enabled: false },
@@ -37,5 +39,34 @@ describe('plugin_setup', function () {
   it('registers', function () {
     this.plugin.register()
     assert.deepEqual(this.plugin.cfg, default_config)
+  })
+
+  it('registers every hook when all features are enabled', () => {
+    const p = new fixtures.plugin('index')
+    p.load_limit_ini = function () {
+      this.cfg = {
+        main: {},
+        concurrency: { enabled: true },
+        errors: { enabled: true },
+        recipients: { enabled: true },
+        unrecognized_commands: { enabled: true },
+        rate_conn: { enabled: true },
+        rate_rcpt_host: { enabled: true },
+        rate_rcpt_sender: { enabled: true },
+        rate_rcpt_null: { enabled: true },
+        rate_rcpt: { enabled: true },
+        outbound: { enabled: true },
+      }
+    }
+    p.register()
+    assert.ok(p.cfg.concurrency.enabled)
+  })
+
+  it('defaults concurrency to {} when absent from config', () => {
+    const p = bare()
+    p.config = { get: () => ({ main: {} }) }
+    p.merge_redis_ini = () => {}
+    p.load_limit_ini()
+    assert.deepEqual(p.cfg.concurrency, {})
   })
 })

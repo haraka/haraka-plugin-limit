@@ -1,47 +1,74 @@
-const assert = require('assert')
+const assert = require('node:assert/strict')
 
-// var Address      = require('address-rfc2821').Address;
+const { after, before, beforeEach, describe, it } = require('node:test')
+
 const constants = require('haraka-constants')
-const fixtures = require('haraka-test-fixtures')
 
-function _set_up(done) {
-  this.plugin = new fixtures.plugin('index')
-  this.plugin.register()
-  this.server = { notes: {} }
-  this.plugin.init_redis_plugin(function () {
-    done()
-  }, this.server)
-}
+const { bare, hook, redisPlugin } = require('./helpers')
 
-describe('outbound_increment', function () {
-  before(_set_up)
+describe('outbound', () => {
+  let plugin
 
-  it('no limit, no delay', async function () {
-    await new Promise((resolve) => {
-      this.plugin.outbound_increment(
-        function (code, msg) {
-          assert.equal(code, undefined)
-          assert.equal(msg, undefined)
-          resolve()
-        },
-        { domain: 'test.com' },
-      )
+  before(async () => {
+    plugin = await redisPlugin(6)
+  })
+  after(async () => {
+    if (plugin?.db) await plugin.db.quit()
+  })
+  beforeEach(async () => {
+    await plugin.db.flushDb()
+    plugin.cfg.outbound = {}
+  })
+
+  describe('outbound_increment', () => {
+    it('delivers (no limit) and counts the message', async () => {
+      const { rc } = await hook(plugin, 'outbound_increment', {
+        domain: 'test.com',
+      })
+      assert.equal(rc, undefined)
+      const h = await plugin.db.hGetAll('outbound-rate:test.com')
+      assert.equal(h.TOTAL, '1')
+    })
+
+    it('delays when the domain limit is exceeded', async () => {
+      plugin.cfg.outbound['slow.com'] = 1
+      await plugin.db.hSet('outbound-rate:slow.com', 'TOTAL', '5')
+      const { rc, msg } = await hook(plugin, 'outbound_increment', {
+        todo: { domain: 'slow.com' },
+      })
+      assert.equal(rc, constants.delay)
+      assert.equal(msg, 30)
+    })
+
+    it('just delivers on a real redis WRONGTYPE error', async () => {
+      await plugin.db.set('outbound-rate:test.com', 'str')
+      const { rc } = await hook(plugin, 'outbound_increment', {
+        domain: 'test.com',
+      })
+      assert.equal(rc, undefined)
+    })
+
+    it('is a no-op without a db', async () => {
+      const { rc } = await hook(bare({ outbound: {} }), 'outbound_increment', {
+        domain: 'test.com',
+      })
+      assert.equal(rc, undefined)
     })
   })
 
-  it('limits has delay', async function () {
-    const self = this
-    self.plugin.cfg.outbound['slow.test.com'] = 3
-    await self.plugin.db.hSet('outbound-rate:slow.test.com', 'TOTAL', 4)
-    await new Promise((resolve) => {
-      self.plugin.outbound_increment(
-        function (code, delay) {
-          assert.equal(code, constants.delay)
-          assert.equal(delay, 30)
-          resolve()
-        },
-        { domain: 'slow.test.com' },
-      )
+  describe('outbound_decrement', () => {
+    it('lowers the counter', async () => {
+      await plugin.db.hSet('outbound-rate:test.com', 'TOTAL', '3')
+      await hook(plugin, 'outbound_decrement', { domain: 'test.com' })
+      const h = await plugin.db.hGetAll('outbound-rate:test.com')
+      assert.equal(h.TOTAL, '2')
+    })
+
+    it('is a no-op without a db', async () => {
+      const { rc } = await hook(bare({ outbound: {} }), 'outbound_decrement', {
+        domain: 'test.com',
+      })
+      assert.equal(rc, undefined)
     })
   })
 })

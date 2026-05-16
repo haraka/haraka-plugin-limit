@@ -1,40 +1,41 @@
-const assert = require('assert')
-const path = require('path')
+const assert = require('node:assert/strict')
 
-// const constants    = require('haraka-constants');
-const fixtures = require('haraka-test-fixtures')
+const { describe, it } = require('node:test')
 
-describe('get_history_limit', function () {
-  before(function () {
-    this.plugin = new fixtures.plugin('index')
-    this.plugin.config = this.plugin.config.module_config(path.resolve('test'))
+const { bare, conn } = require('./helpers')
 
-    this.connection = new fixtures.connection.createConnection()
-    this.connection.init_transaction()
+describe('get_history_limit', () => {
+  const HIST = { enabled: true, plugin: 'karma', good: 5, bad: 1, none: 2 }
 
-    this.plugin.register()
+  for (const [label, history, expected] of [
+    ['good (history > 0)', 1, 5],
+    ['bad (history < 0)', -1, 1],
+    ['none (history == 0)', 0, 2],
+  ]) {
+    it(label, () => {
+      const plugin = bare({ concurrency_history: { ...HIST } })
+      const c = conn()
+      c.results.add({ name: 'karma' }, { history })
+      assert.equal(plugin.get_history_limit('concurrency', c), expected)
+    })
+  }
 
-    this.plugin.cfg.concurrency_history = {
-      enabled: true,
-      plugin: 'karma',
-      good: 5,
-      bad: 1,
-      none: 2,
-    }
+  it('disables the history config when its plugin has no results', () => {
+    const plugin = bare({ concurrency_history: { ...HIST } })
+    assert.equal(plugin.get_history_limit('concurrency', conn()), undefined)
+    assert.equal(plugin.cfg.concurrency_history, undefined)
   })
 
-  it('good', () => {
-    connection.results.add({ name: 'karma' }, { history: 1 })
-    assert.equal(5, plugin.get_history_limit('concurrency', connection))
-  })
-
-  it('bad', () => {
-    connection.results.add({ name: 'karma' }, { history: -1 })
-    assert.equal(1, plugin.get_history_limit('concurrency', connection))
-  })
-
-  it('none', () => {
-    connection.results.add({ name: 'karma' }, { history: 0 })
-    assert.equal(2, plugin.get_history_limit('concurrency', connection))
-  })
+  for (const [reason, cfg, results] of [
+    ['results carry no history field', { ...HIST }, { note: 'x' }],
+    ['the history config is disabled', { enabled: false }, null],
+    ['no plugin is named', { enabled: true }, null],
+  ]) {
+    it(`returns undefined when ${reason}`, () => {
+      const plugin = bare({ concurrency_history: cfg })
+      const c = conn()
+      if (results) c.results.add({ name: 'karma' }, results)
+      assert.equal(plugin.get_history_limit('concurrency', c), undefined)
+    })
+  }
 })
