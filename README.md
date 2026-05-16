@@ -9,7 +9,8 @@ Apply many types of limits to SMTP connections:
     - max recipients
     - max unrecognized commands
     - max SMTP errors
-    - outbound concurrency
+    - outbound concurrency (`[outbound]`)
+    - outbound rate limiting (`[rate_outbound]`)
     - rate limits
         - max connections / period
         - max recipients / period
@@ -183,9 +184,28 @@ enabled=true
 ; delay=30
 ;example.com=10
 
-The number after the domain is the maximum concurrency limit for that domain.
+The number after the domain is the maximum **concurrency** limit for that domain — it caps how many outbound messages may be in-flight to that domain at one time. For rate limiting (messages per time window), see `[rate_outbound]` below.
 
-Delay is the number of seconds to wait before retrying this message. Outbound concurrency is checked on every attempt to deliver.
+Delay is the number of seconds to wait before retrying this message. Outbound concurrency is checked on every delivery attempt.
+
+### [rate_outbound]
+
+enabled=true
+;gmail.com=10/1m
+;default=500/1h
+
+Limit the number of outbound messages sent to a destination domain within a sliding time window. The key is the destination domain (matched from most-specific to least-specific subdomain). The value format is `<limit>/<qty><unit>`:
+
+- `10/1m` — 10 messages per minute
+- `100/1h` — 100 messages per hour
+- `500/1d` — 500 messages per day
+- `0` — explicitly disabled for this domain (no limit)
+
+When the limit is exceeded, Haraka delays delivery for the remainder of the current window (the TTL of the Redis counter key). The counter is stored in Redis under `rate_outbound:<domain>`.
+
+A special key `default` applies to any domain not otherwise configured. If neither a domain match nor a default is found, the message is delivered without a rate limit.
+
+Issue #54 (per-domain TCP connection concurrency) requires changes to the Haraka core outbound connection pool and is not configurable here. Use `max_outbound_connections` in `outbound.ini` as a global cap.
 
 ## CAUTION
 

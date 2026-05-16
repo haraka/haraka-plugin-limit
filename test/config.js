@@ -9,6 +9,7 @@ const { bare } = require('./helpers')
 const default_config = {
   main: { tarpit_delay: 0 },
   outbound: { enabled: false },
+  rate_outbound: { enabled: false },
   recipients: { enabled: false },
   recipients_history: { enabled: false },
   unrecognized_commands: { enabled: false },
@@ -59,6 +60,7 @@ describe('plugin_setup', () => {
         rate_rcpt_null: { enabled: true },
         rate_rcpt: { enabled: true },
         outbound: { enabled: true },
+        rate_outbound: { enabled: true },
       }
     }
     p.register()

@@ -59,6 +59,11 @@ exports.register = function () {
     this.register_hook('bounce', 'outbound_decrement')
   }
 
+  if (this.cfg.rate_outbound?.enabled) {
+    needs_redis++
+    this.register_hook('send_email', 'rate_outbound')
+  }
+
   if (needs_redis) {
     this.register_hook('init_master', 'init_redis_plugin')
     this.register_hook('init_child', 'init_redis_plugin')
@@ -71,6 +76,7 @@ exports.load_limit_ini = function () {
     {
       booleans: [
         '-outbound.enabled',
+        '-rate_outbound.enabled',
         '-recipients.enabled',
         '-unrecognized_commands.enabled',
         '-errors.enabled',
@@ -360,6 +366,25 @@ exports.get_mail_key = function (type, mail) {
   return [email, 0]
 }
 
+exports.get_domain_key = function (type, domain) {
+  if (!this.cfg[type] || !domain) return [domain, 0]
+
+  const parts = domain.toLowerCase().split('.')
+  while (parts.length) {
+    const part = parts.join('.')
+    if (this.cfg[type][part] !== undefined) {
+      return [part, this.cfg[type][part]]
+    }
+    parts.shift() // remove leftmost (most specific) subdomain label
+  }
+
+  if (this.cfg[type].default) {
+    return [domain, this.cfg[type].default]
+  }
+
+  return [domain, 0]
+}
+
 function getTTL(value) {
   const match = /^(\d+)(?:\/(\d+)(\S)?)?$/.exec(value)
   if (!match) return
@@ -630,4 +655,28 @@ exports.outbound_decrement = function (next, hmail) {
 
   this.db.hIncrBy(getOutKey(getOutDom(hmail)), 'TOTAL', -1)
   next()
+}
+
+exports.rate_outbound = async function (next, hmail) {
+  if (!this.db) return next()
+
+  const domain = getOutDom(hmail)
+  const [key, value] = this.get_domain_key('rate_outbound', domain)
+
+  if (value === 0) return next() // explicitly disabled for this domain
+  if (!key || !value) return next()
+
+  const limit = getLimit(value)
+  const ttl = getTTL(value)
+  if (!limit || !ttl) return next()
+
+  try {
+    const count = await this.db.incr(`rate_outbound:${key}`)
+    if (count === 1) this.db.expire(`rate_outbound:${key}`, ttl)
+    if (parseInt(count, 10) > limit) return next(constants.delay, parseInt(ttl, 10))
+    next()
+  } catch (err) {
+    this.logerror(`rate_outbound: ${err}`)
+    next() // fail-open: deliver rather than silently drop
+  }
 }
