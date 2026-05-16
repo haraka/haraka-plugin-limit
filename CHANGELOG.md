@@ -4,6 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
+- feat: add rate_outbound
 - fix: correctly handle IPv6 in get_host_key
 - deps(all): bump to latest
 - test: expanded test coverage
