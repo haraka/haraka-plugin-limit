@@ -17,7 +17,7 @@
   "devDependencies": {
     "address-rfc2821": "^2.1.3",
     "@haraka/eslint-config": "^2.0.4",
-    "haraka-test-fixtures": "^1.5.1"
+    "haraka-test-fixtures": "~1.3.9"
   },
   "scripts": {
     "format": "npm run prettier:fix && npm run lint:fix",
