@@ -28,7 +28,8 @@
     "test": "node --test --test-force-exit test/*.js",
     "versions": "npx npm-dep-mgr check",
     "versions:fix": "npx npm-dep-mgr update",
-    "test:coverage": "node --test --test-force-exit --experimental-test-coverage --test-coverage-exclude=package.json --test-coverage-exclude=test/*.js test/*.js"
+    "test:coverage": "node --test --test-force-exit --experimental-test-coverage --test-coverage-exclude=package.json --test-coverage-exclude=test/*.js test/*.js",
+    "test:coverage:lcov": "mkdir -p coverage && node --test --experimental-test-coverage --test-coverage-exclude=package.json --test-coverage-exclude=test/*.js --test-reporter=lcov --test-reporter-destination=coverage/lcov.info test/*.js"
   },
   "repository": {
     "type": "git",

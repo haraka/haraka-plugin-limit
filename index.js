@@ -281,21 +281,23 @@ exports.get_host_key = function (type, connection) {
   }
 
   let ip
+  let is_ipv6 = false
   try {
-    ip = ipaddr.parse(connection.remote.ip)
-    if (ip.kind === 'ipv6') {
-      ip = ipaddr.toNormalizedString()
-    } else {
-      ip = ip.toString()
-    }
+    const parsed = ipaddr.parse(connection.remote.ip)
+    is_ipv6 = parsed.kind() === 'ipv6'
+    // ipaddr.js `kind` is a method; once we stringify `ip` below it is no
+    // longer an ipaddr object, so capture the family in `is_ipv6` first.
+    // IPv6 is normalized (groups uncompressed, no `::`) so the `:`-split
+    // prefix walk below is deterministic.
+    ip = is_ipv6 ? parsed.toNormalizedString() : parsed.toString()
   } catch (err) {
     connection.results.add(this, { err: `${type}: ${err.message}` })
     return
   }
 
-  const ip_array = ip.kind === 'ipv6' ? ip.split(':') : ip.split('.')
+  const ip_array = is_ipv6 ? ip.split(':') : ip.split('.')
   while (ip_array.length) {
-    const part = ip.kind === 'ipv6' ? ip_array.join(':') : ip_array.join('.')
+    const part = is_ipv6 ? ip_array.join(':') : ip_array.join('.')
     if (this.cfg[type][part] || this.cfg[type][part] === 0) {
       return [part, this.cfg[type][part]]
     }

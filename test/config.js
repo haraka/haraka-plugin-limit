@@ -1,5 +1,5 @@
 const assert = require('assert')
-const { beforeEach, describe, it } = require('node:test')
+const { before, describe, it } = require('node:test')
 const path = require('path')
 
 const fixtures = require('haraka-test-fixtures')
@@ -24,22 +24,24 @@ const default_config = {
   concurrency_history: { enabled: false },
 }
 
-describe('plugin_setup', function () {
-  beforeEach(function () {
-    this.plugin = new fixtures.plugin('index')
-    this.plugin.config = this.plugin.config.module_config(path.resolve('test'))
+describe('plugin_setup', () => {
+  let plugin
+
+  before(() => {
+    plugin = new fixtures.plugin('index')
+    plugin.config = plugin.config.module_config(path.resolve('test'))
   })
 
-  it('loads config', function () {
+  it('loads config', () => {
     // gotta inherit b/c config loader merges in defaults from redis.ini
-    this.plugin.inherits('haraka-plugin-redis')
-    this.plugin.load_limit_ini()
-    assert.deepEqual(this.plugin.cfg, default_config) // loaded config
+    plugin.inherits('haraka-plugin-redis')
+    plugin.load_limit_ini()
+    assert.deepEqual(plugin.cfg, default_config) // loaded config
   })
 
-  it('registers', function () {
-    this.plugin.register()
-    assert.deepEqual(this.plugin.cfg, default_config)
+  it('registers', () => {
+    plugin.register()
+    assert.deepEqual(plugin.cfg, default_config)
   })
 
   it('registers every hook when all features are enabled', () => {
