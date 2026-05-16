@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
+- fix: correctly handle IPv6 in get_host_key
+- deps(all): bump to latest
 - test: expanded test coverage
 - test: remove done callbacks in sync tests #73
 

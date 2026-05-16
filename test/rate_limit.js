@@ -32,7 +32,6 @@ describe('get_host_key', () => {
       { ip: '8.8.8.8', host: 'mail.example.com' },
       ['mail.example.com', 3],
     ],
-/*
     [
       'IPv6 address (normalized, full)',
       'rate_conn',
@@ -47,7 +46,6 @@ describe('get_host_key', () => {
       { ip: '2001:db8::5', host: '' },
       ['2001:db8', 9],
     ],
-*/
     [
       'custom default',
       'rate_conn',
