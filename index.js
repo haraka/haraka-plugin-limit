@@ -673,7 +673,8 @@ exports.rate_outbound = async function (next, hmail) {
   try {
     const count = await this.db.incr(`rate_outbound:${key}`)
     if (count === 1) this.db.expire(`rate_outbound:${key}`, ttl)
-    if (parseInt(count, 10) > limit) return next(constants.delay, parseInt(ttl, 10))
+    if (parseInt(count, 10) > limit)
+      return next(constants.delay, parseInt(ttl, 10))
     next()
   } catch (err) {
     this.logerror(`rate_outbound: ${err}`)

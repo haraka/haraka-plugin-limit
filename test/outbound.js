@@ -59,13 +59,17 @@ describe('outbound', () => {
       plugin.cfg.outbound['slow.com'] = 1
 
       // First message: under limit, should deliver and TOTAL=1
-      const r1 = await hook(plugin, 'outbound_increment', { domain: 'slow.com' })
+      const r1 = await hook(plugin, 'outbound_increment', {
+        domain: 'slow.com',
+      })
       assert.equal(r1.rc, undefined)
       let h = await plugin.db.hGetAll('outbound-rate:slow.com')
       assert.equal(h.TOTAL, '1')
 
       // Second message while first is in-flight: over limit, should delay, TOTAL stays 1 (undo worked)
-      const r2 = await hook(plugin, 'outbound_increment', { domain: 'slow.com' })
+      const r2 = await hook(plugin, 'outbound_increment', {
+        domain: 'slow.com',
+      })
       assert.equal(r2.rc, constants.delay)
       h = await plugin.db.hGetAll('outbound-rate:slow.com')
       assert.equal(h.TOTAL, '1')
@@ -76,7 +80,9 @@ describe('outbound', () => {
       assert.equal(h.TOTAL, '0')
 
       // Second message retries: slot is free, should deliver, TOTAL=1
-      const r3 = await hook(plugin, 'outbound_increment', { domain: 'slow.com' })
+      const r3 = await hook(plugin, 'outbound_increment', {
+        domain: 'slow.com',
+      })
       assert.equal(r3.rc, undefined)
       h = await plugin.db.hGetAll('outbound-rate:slow.com')
       assert.equal(h.TOTAL, '1')
@@ -105,11 +111,9 @@ describe('outbound', () => {
     })
 
     it('is a no-op without a db', async () => {
-      const { rc } = await hook(
-        bare({ rate_outbound: {} }),
-        'rate_outbound',
-        { domain: 'test.com' },
-      )
+      const { rc } = await hook(bare({ rate_outbound: {} }), 'rate_outbound', {
+        domain: 'test.com',
+      })
       assert.equal(rc, undefined)
     })
 
@@ -124,19 +128,25 @@ describe('outbound', () => {
     it('delays when the limit is exceeded', async () => {
       plugin.cfg.rate_outbound['slow.com'] = '1/30s'
       await plugin.db.set('rate_outbound:slow.com', '5')
-      const { rc, msg } = await hook(plugin, 'rate_outbound', { domain: 'slow.com' })
+      const { rc, msg } = await hook(plugin, 'rate_outbound', {
+        domain: 'slow.com',
+      })
       assert.equal(rc, constants.delay)
       assert.equal(msg, 30) // delay = TTL = 30s
     })
 
     it('passes through when value is 0 (disabled for domain)', async () => {
       plugin.cfg.rate_outbound['exempt.com'] = 0
-      const { rc } = await hook(plugin, 'rate_outbound', { domain: 'exempt.com' })
+      const { rc } = await hook(plugin, 'rate_outbound', {
+        domain: 'exempt.com',
+      })
       assert.equal(rc, undefined)
     })
 
     it('passes through when domain is not configured', async () => {
-      const { rc } = await hook(plugin, 'rate_outbound', { domain: 'unknown.com' })
+      const { rc } = await hook(plugin, 'rate_outbound', {
+        domain: 'unknown.com',
+      })
       assert.equal(rc, undefined)
     })
 
