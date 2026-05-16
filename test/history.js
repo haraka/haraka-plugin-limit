@@ -23,27 +23,18 @@ describe('get_history_limit', function () {
     }
   })
 
-  it('good', function () {
-    this.connection.results.add({ name: 'karma' }, { history: 1 })
-    assert.equal(
-      5,
-      this.plugin.get_history_limit('concurrency', this.connection),
-    )
+  it('good', () => {
+    connection.results.add({ name: 'karma' }, { history: 1 })
+    assert.equal(5, plugin.get_history_limit('concurrency', connection))
   })
 
-  it('bad', function () {
-    this.connection.results.add({ name: 'karma' }, { history: -1 })
-    assert.equal(
-      1,
-      this.plugin.get_history_limit('concurrency', this.connection),
-    )
+  it('bad', () => {
+    connection.results.add({ name: 'karma' }, { history: -1 })
+    assert.equal(1, plugin.get_history_limit('concurrency', connection))
   })
 
-  it('none', function () {
-    this.connection.results.add({ name: 'karma' }, { history: 0 })
-    assert.equal(
-      2,
-      this.plugin.get_history_limit('concurrency', this.connection),
-    )
+  it('none', () => {
+    connection.results.add({ name: 'karma' }, { history: 0 })
+    assert.equal(2, plugin.get_history_limit('concurrency', connection))
   })
 })

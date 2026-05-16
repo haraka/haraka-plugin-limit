@@ -22,11 +22,8 @@ describe('get_host_key', function () {
     assert.equal(limit, 5)
   })
 
-  it('rate_rcpt_host', function () {
-    const [ip, limit] = this.plugin.get_host_key(
-      'rate_rcpt_host',
-      this.connection,
-    )
+  it('rate_rcpt_host', () => {
+    const [ip, limit] = plugin.get_host_key('rate_rcpt_host', connection)
     assert.equal(ip, '1.2.3.4')
     assert.equal(limit, '50/5m')
   })
@@ -84,12 +81,8 @@ describe('rate_limit', function () {
     assert.equal(is_limited, false)
   })
 
-  it('below 50/5m limit', async function () {
-    const is_limited = await this.plugin.rate_limit(
-      this.connection,
-      'key',
-      '50/5m',
-    )
+  it('below 50/5m limit', async () => {
+    const is_limited = await plugin.rate_limit(connection, 'key', '50/5m')
     assert.equal(is_limited, false)
   })
 })
