@@ -1,6 +1,7 @@
 const assert = require('assert')
-
+const { beforeEach, describe, it } = require('node:test')
 const path = require('path')
+
 const fixtures = require('haraka-test-fixtures')
 
 const { bare } = require('./helpers')
@@ -24,7 +25,7 @@ const default_config = {
 }
 
 describe('plugin_setup', function () {
-  before(function () {
+  beforeEach(function () {
     this.plugin = new fixtures.plugin('index')
     this.plugin.config = this.plugin.config.module_config(path.resolve('test'))
   })

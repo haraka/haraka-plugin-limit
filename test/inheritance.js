@@ -1,4 +1,5 @@
-const assert = require('assert')
+const assert = require('node:assert')
+const { beforeEach, describe, it } = require('node:test')
 
 const fixtures = require('haraka-test-fixtures')
 
@@ -12,19 +13,19 @@ describe('inheritance', () => {
   })
 
   it('inherits redis', function () {
-    this.plugin.inherits('haraka-plugin-redis')
-    assert.equal(typeof this.plugin.load_redis_ini, 'function')
+    plugin.inherits('haraka-plugin-redis')
+    assert.equal(typeof plugin.load_redis_ini, 'function')
   })
 
   it('can call parent functions', function () {
-    this.plugin.inherits('haraka-plugin-redis')
-    this.plugin.load_redis_ini()
-    assert.ok(this.plugin.redisCfg) // loaded config
+    plugin.inherits('haraka-plugin-redis')
+    plugin.load_redis_ini()
+    assert.ok(plugin.redisCfg) // loaded config
   })
 
   it('register', function () {
-    this.plugin.register()
-    assert.ok(this.plugin.cfg) // loaded config
+    plugin.register()
+    assert.ok(plugin.cfg) // loaded config
   })
 })
 

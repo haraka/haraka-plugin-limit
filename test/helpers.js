@@ -3,7 +3,7 @@
 
 const path = require('node:path')
 
-const { Address } = require('@haraka/email-address')
+const { Address } = require('address-rfc2821')
 const fixtures = require('haraka-test-fixtures')
 
 // plugin with limit.ini loaded from test/config/, registered, no redis
