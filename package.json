@@ -25,11 +25,11 @@
     "lint:fix": "npx eslint *.js test --fix",
     "prettier": "npx prettier . --check",
     "prettier:fix": "npx prettier . --write --log-level=warn",
-    "test": "node --test --test-force-exit test/*.js",
+    "test": "node --test test/*.js",
+    "test:coverage": "node --test --experimental-test-coverage test/*.js",
+    "test:coverage:lcov": "mkdir -p coverage && node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info test/*.js",
     "versions": "npx npm-dep-mgr check",
-    "versions:fix": "npx npm-dep-mgr update",
-    "test:coverage": "node --test --test-force-exit --experimental-test-coverage --test-coverage-exclude=package.json --test-coverage-exclude=test/*.js test/*.js",
-    "test:coverage:lcov": "mkdir -p coverage && node --test --experimental-test-coverage --test-coverage-exclude=package.json --test-coverage-exclude=test/*.js --test-reporter=lcov --test-reporter-destination=coverage/lcov.info test/*.js"
+    "versions:fix": "npx npm-dep-mgr update"
   },
   "repository": {
     "type": "git",
