@@ -1,168 +1,409 @@
-const assert = require('assert')
-const path = require('path')
+const assert = require('node:assert')
 
-const Address = require('address-rfc2821').Address
+const { after, before, beforeEach, describe, it } = require('node:test')
+
 const constants = require('haraka-constants')
-const fixtures = require('haraka-test-fixtures')
 
-function setUp() {
-  this.plugin = new fixtures.plugin('rate_limit')
+const { Address, bare, conn, hook, redisPlugin } = require('./helpers')
 
-  this.connection = new fixtures.connection.createConnection()
-  this.connection.remote = { ip: '1.2.3.4', host: 'test.com' }
+const { DENYSOFT, DENYSOFTDISCONNECT } = constants
 
-  this.plugin.register()
-}
-
-describe('get_host_key', function () {
-  before(setUp)
-  it('rate_conn', function () {
-    const [ip, limit] = this.plugin.get_host_key('rate_conn', this.connection)
-    assert.equal(ip, '1.2.3.4')
-    assert.equal(limit, 5)
-  })
-
-  it('rate_rcpt_host', function () {
-    const [ip, limit] = this.plugin.get_host_key(
+describe('get_host_key', () => {
+  // [label, type, cfg, remote, expected | undefined, errRegExp?]
+  const cases = [
+    [
+      'rate_conn default',
+      'rate_conn',
+      { rate_conn: { default: 5 } },
+      { ip: '1.2.3.4', host: 'test.com' },
+      ['1.2.3.4', 5],
+    ],
+    [
+      'rate_rcpt_host default',
       'rate_rcpt_host',
-      this.connection,
-    )
-    assert.equal(ip, '1.2.3.4')
-    assert.equal(limit, '50/5m')
+      { rate_rcpt_host: { default: '50/5m' } },
+      { ip: '1.2.3.4', host: 'test.com' },
+      ['1.2.3.4', '50/5m'],
+    ],
+    [
+      'rDNS host match',
+      'rate_conn',
+      { rate_conn: { 'mail.example.com': 3 } },
+      { ip: '8.8.8.8', host: 'mail.example.com' },
+      ['mail.example.com', 3],
+    ],
+/*
+    [
+      'IPv6 address (normalized, full)',
+      'rate_conn',
+      { rate_conn: { '2001:db8:0:0:0:0:0:5': 7 } },
+      { ip: '2001:db8::5', host: '' },
+      ['2001:db8:0:0:0:0:0:5', 7],
+    ],
+    [
+      'IPv6 prefix (group-wise pop)',
+      'rate_conn',
+      { rate_conn: { '2001:db8': 9 } },
+      { ip: '2001:db8::5', host: '' },
+      ['2001:db8', 9],
+    ],
+*/
+    [
+      'custom default',
+      'rate_conn',
+      { rate_conn: { default: 5 } },
+      { ip: '8.8.8.8', host: 'mail.example.com' },
+      ['8.8.8.8', 5],
+    ],
+    [
+      'unlimited (0) with no match',
+      'rate_conn',
+      { rate_conn: {} },
+      { ip: '8.8.8.8', host: 'mail.example.com' },
+      ['8.8.8.8', 0],
+    ],
+    [
+      'error: type not configured',
+      'rate_conn',
+      {},
+      { ip: '8.8.8.8', host: '' },
+      undefined,
+      /rate_conn: not configured/,
+    ],
+    [
+      'error: unparseable ip',
+      'rate_conn',
+      { rate_conn: { default: 5 } },
+      { ip: 'not-an-ip', host: '' },
+      undefined,
+      /rate_conn:/,
+    ],
+  ]
+
+  for (const [label, type, cfg, remote, expected, errRe] of cases) {
+    it(label, () => {
+      const plugin = bare(cfg)
+      const c = conn(remote)
+      const r = plugin.get_host_key(type, c)
+      if (expected === undefined) {
+        assert.equal(r, undefined)
+        assert.match(c.results.get(plugin).err.join(' '), errRe)
+      } else {
+        assert.deepEqual(r, expected)
+      }
+    })
+  }
+
+  it('falls back to the history limit', () => {
+    const plugin = bare({
+      rate_conn: {},
+      rate_conn_history: { enabled: true, plugin: 'karma', good: 11 },
+    })
+    const c = conn({ ip: '8.8.8.8', host: '' })
+    c.results.add({ name: 'karma' }, { history: 1 }) // good
+    assert.deepEqual(plugin.get_host_key('rate_conn', c), ['8.8.8.8', 11])
   })
 })
 
-describe('get_mail_key', function () {
-  beforeEach(function () {
-    this.plugin = new fixtures.plugin('rate_limit')
-    this.connection = new fixtures.connection.createConnection()
-    this.plugin.register()
-  })
-
-  it('rate_rcpt_sender', function () {
-    const [addr, limit] = this.plugin.get_mail_key(
-      'rate_rcpt_sender',
-      new Address('<user@example.com>'),
-    )
-    // console.log(arguments);
-    assert.equal(addr, 'user@example.com')
-    assert.equal(limit, '50/5m')
-  })
-  it('rate_rcpt_null', function () {
-    const [addr, limit] = this.plugin.get_mail_key(
-      'rate_rcpt_null',
-      new Address('<postmaster>'),
-    )
-    // console.log(arguments);
-    assert.equal(addr, 'postmaster')
-    assert.equal(limit, '1')
-  })
-  it('rate_rcpt', function () {
-    const [addr, limit] = this.plugin.get_mail_key(
+describe('get_mail_key', () => {
+  // [label, type, cfg, address, expected]
+  const cases = [
+    [
+      'full email address',
       'rate_rcpt',
-      new Address('<user@example.com>'),
+      { rate_rcpt: { 'user@example.com': 2 } },
+      '<user@example.com>',
+      ['user@example.com', 2],
+    ],
+    [
+      'RHS host',
+      'rate_rcpt',
+      { rate_rcpt: { 'host.example.com': 3 } },
+      '<user@host.example.com>',
+      ['host.example.com', 3],
+    ],
+    [
+      'custom default',
+      'rate_rcpt',
+      { rate_rcpt: { default: '9/1m' } },
+      '<user@nomatch.com>',
+      ['user@nomatch.com', '9/1m'],
+    ],
+    [
+      'unlimited (0) with no match',
+      'rate_rcpt',
+      { rate_rcpt: {} },
+      '<user@nomatch.com>',
+      ['user@nomatch.com', 0],
+    ],
+    [
+      'rate_rcpt_sender default',
+      'rate_rcpt_sender',
+      { rate_rcpt_sender: { default: '50/5m' } },
+      '<user@example.com>',
+      ['user@example.com', '50/5m'],
+    ],
+    [
+      'rate_rcpt_null postmaster default',
+      'rate_rcpt_null',
+      { rate_rcpt_null: { default: 1 } },
+      '<postmaster>',
+      ['postmaster', 1],
+    ],
+  ]
+
+  for (const [label, type, cfg, addr, expected] of cases) {
+    it(label, () => {
+      const r = bare(cfg).get_mail_key(type, new Address(addr))
+      assert.deepEqual(r, expected)
+    })
+  }
+
+  it('returns undefined when type unconfigured or mail missing', () => {
+    assert.equal(bare().get_mail_key('rate_rcpt', null), undefined)
+    assert.equal(
+      bare({ rate_rcpt: {} }).get_mail_key('rate_rcpt', null),
+      undefined,
     )
-    // console.log(arguments);
-    assert.equal(addr, 'user@example.com')
-    assert.equal(limit, '50/5m')
   })
 })
 
-describe('rate_limit', function () {
-  beforeEach(function (done) {
-    this.plugin = new fixtures.plugin('rate_limit')
-    this.connection = new fixtures.connection.createConnection()
-    this.plugin.register()
-    const server = { notes: {} }
-    this.plugin.init_redis_plugin(function () {
-      done()
-    }, server)
+describe('redis-backed rate limits', () => {
+  let plugin
+
+  before(async () => {
+    plugin = await redisPlugin(5)
+  })
+  after(async () => {
+    if (plugin?.db) await plugin.db.quit()
+  })
+  beforeEach(async () => {
+    await plugin.db.flushDb()
   })
 
-  it('no limit', async function () {
-    const is_limited = await this.plugin.rate_limit(this.connection, 'key', 0)
-    assert.equal(is_limited, false)
-  })
+  describe('rate_limit', () => {
+    let c
+    beforeEach(() => {
+      plugin.cfg = {}
+      c = conn()
+    })
 
-  it('below 50/5m limit', async function () {
-    const is_limited = await this.plugin.rate_limit(
-      this.connection,
-      'key',
-      '50/5m',
-    )
-    assert.equal(is_limited, false)
-  })
-})
+    it('disabled (value 0) returns false', async () => {
+      assert.equal(await plugin.rate_limit(c, 'k', 0), false)
+    })
 
-describe('rate_conn', function () {
-  beforeEach(function (done) {
-    this.server = { notes: {} }
+    it('returns undefined without a db', async () => {
+      assert.equal(await bare().rate_limit(c, 'k', '5/1m'), undefined)
+    })
 
-    this.plugin = new fixtures.plugin('rate_limit')
-    this.plugin.config = this.plugin.config.module_config(path.resolve('test'))
+    it('records a syntax error for a bad value', async () => {
+      assert.equal(await plugin.rate_limit(c, 'k', 'abc'), undefined)
+      assert.match(c.results.get(plugin).err.join(' '), /syntax error/)
+    })
 
-    this.connection = new fixtures.connection.createConnection()
-    this.connection.remote.ip = '1.2.3.4'
-    this.connection.remote.host = 'mail.example.com'
+    for (const value of ['5/2m', '5/2h', '5/2d', '5/2s', '5/2x']) {
+      it(`parses "${value}" and stays under the limit`, async () => {
+        assert.equal(await plugin.rate_limit(c, `k:${value}`, value), false)
+      })
+    }
 
-    this.plugin.register()
-    this.plugin.init_redis_plugin(function () {
-      done()
-    }, this.server)
-  })
+    it('trips when the count exceeds the limit', async () => {
+      await plugin.db.set('hot', 2)
+      assert.equal(await plugin.rate_limit(c, 'hot', '2/1m'), true)
+    })
 
-  it('default limit', async function () {
-    const plugin = this.plugin
-    const connection = this.connection
-
-    await new Promise((resolve) => {
-      plugin.rate_conn_incr(function () {
-        plugin.rate_conn_enforce(
-          function (code, msg) {
-            const rc = connection.results.get(plugin.name)
-            assert.ok(rc.rate_conn)
-
-            const match = /([\d]+):(.*)$/.exec(rc.rate_conn) // 1/5
-
-            if (parseInt(match[1]) <= parseInt(match[2])) {
-              assert.equal(code, undefined)
-              assert.equal(msg, undefined)
-            } else {
-              assert.equal(code, constants.DENYSOFTDISCONNECT)
-              assert.equal(msg, 'connection rate limit exceeded')
-            }
-            resolve()
-          }.bind(this),
-          connection,
-        )
-      }, connection)
+    it('records an error on a real redis WRONGTYPE', async () => {
+      await plugin.db.hSet('hashkey', 'f', '1') // wrong type for INCR
+      await plugin.rate_limit(c, 'hashkey', '5/1m')
+      assert.match(c.results.get(plugin).err.join(' '), /hashkey/)
     })
   })
 
-  it('defined limit', async function () {
-    const plugin = this.plugin
-    const connection = this.connection
-    plugin.cfg.rate_conn['1.2.3.4'] = '1/5m'
+  describe('rate_rcpt_host', () => {
+    let c
+    beforeEach(() => {
+      plugin.cfg = { rate_rcpt_host: { '1.2.3.4': '2/5m' }, main: {} }
+      c = conn({ ip: '1.2.3.4', host: '' })
+    })
 
-    await new Promise((resolve) => {
-      plugin.rate_conn_incr(function () {
-        plugin.rate_conn_enforce(
-          function (code, msg) {
-            const rc = connection.results.get(plugin.name)
-            assert.ok(rc.rate_conn)
-            const match = /^([\d]+):(.*)$/.exec(rc.rate_conn) // 1/5m
-            if (parseInt(match[1]) <= parseInt(match[2])) {
-              assert.equal(code, undefined)
-              assert.equal(msg, undefined)
-            } else {
-              assert.equal(code, constants.DENYSOFTDISCONNECT)
-              assert.equal(msg, 'connection rate limit exceeded')
-            }
-            resolve()
-          }.bind(this),
-          connection,
+    it('incr increments the host counter', async () => {
+      await hook(plugin, 'rate_rcpt_host_incr', c)
+      assert.equal(await plugin.db.get('rate_rcpt_host:1.2.3.4'), '1')
+    })
+
+    it('incr is a no-op without a db', async () => {
+      assert.equal(
+        (await hook(bare(plugin.cfg), 'rate_rcpt_host_incr', c)).rc,
+        undefined,
+      )
+    })
+
+    it('incr records an error on a real WRONGTYPE', async () => {
+      await plugin.db.hSet('rate_rcpt_host:1.2.3.4', 'f', '1')
+      await hook(plugin, 'rate_rcpt_host_incr', c)
+      assert.ok(c.results.get(plugin).err.length)
+    })
+
+    it('enforce passes when no counter is stored', async () => {
+      assert.equal(
+        (await hook(plugin, 'rate_rcpt_host_enforce', c)).rc,
+        undefined,
+      )
+    })
+
+    it('enforce passes when under the limit', async () => {
+      await plugin.db.set('rate_rcpt_host:1.2.3.4', 1)
+      assert.equal(
+        (await hook(plugin, 'rate_rcpt_host_enforce', c)).rc,
+        undefined,
+      )
+    })
+
+    it('enforce penalizes when over the limit', async () => {
+      await plugin.db.set('rate_rcpt_host:1.2.3.4', 9)
+      const { rc, msg } = await hook(plugin, 'rate_rcpt_host_enforce', c)
+      assert.equal(rc, DENYSOFT)
+      assert.equal(msg, 'recipient rate limit exceeded')
+      assert.equal(c.results.get(plugin).fail.join(' '), 'rate_rcpt_host')
+    })
+
+    it('enforce records an error on a real WRONGTYPE', async () => {
+      await plugin.db.hSet('rate_rcpt_host:1.2.3.4', 'f', '1')
+      const { rc } = await hook(plugin, 'rate_rcpt_host_enforce', c)
+      assert.equal(rc, undefined)
+      assert.match(c.results.get(plugin).err.join(' '), /rate_rcpt_host/)
+    })
+  })
+
+  describe('rate_conn', () => {
+    let c
+    beforeEach(() => {
+      plugin.cfg = { rate_conn: { '1.2.3.4': '2/5m' }, main: {} }
+      c = conn({ ip: '1.2.3.4', host: '' })
+    })
+
+    it('incr then enforce passes under the default limit', async () => {
+      plugin.cfg.rate_conn = { default: 5 }
+      await hook(plugin, 'rate_conn_incr', c)
+      const { rc } = await hook(plugin, 'rate_conn_enforce', c)
+      assert.equal(rc, undefined)
+      assert.match(c.results.get(plugin).rate_conn, /^1:/)
+    })
+
+    it('incr records an error on a real WRONGTYPE', async () => {
+      await plugin.db.set('rate_conn:1.2.3.4', 'str')
+      await hook(plugin, 'rate_conn_incr', c)
+      assert.ok(c.results.get(plugin).err.length)
+    })
+
+    it('enforce flags a bad limit syntax', async () => {
+      plugin.cfg.rate_conn['1.2.3.4'] = 'abc'
+      const { rc } = await hook(plugin, 'rate_conn_enforce', c)
+      assert.equal(rc, undefined)
+      assert.match(c.results.get(plugin).err.join(' '), /rate_conn:syntax/)
+    })
+
+    it('enforce expires stale timestamps and passes', async () => {
+      plugin.cfg.rate_conn['1.2.3.4'] = '5/5m'
+      const key = 'rate_conn:1.2.3.4'
+      await plugin.db.hSet(key, '1000', '1') // ancient (epoch 1s)
+      await plugin.db.hSet(key, String(Date.now()), '1') // fresh
+      const { rc } = await hook(plugin, 'rate_conn_enforce', c)
+      assert.equal(rc, undefined)
+      assert.equal((await plugin.db.hGetAll(key))['1000'], undefined)
+    })
+
+    it('enforce penalizes when over the limit', async () => {
+      const key = 'rate_conn:1.2.3.4'
+      const now = Date.now()
+      await plugin.db.hSet(key, String(now), '5')
+      await plugin.db.hSet(key, String(now + 1), '5')
+      const { rc, msg } = await hook(plugin, 'rate_conn_enforce', c)
+      assert.equal(rc, DENYSOFTDISCONNECT)
+      assert.equal(msg, 'connection rate limit exceeded')
+    })
+
+    it('enforce records an error on a real WRONGTYPE', async () => {
+      await plugin.db.set('rate_conn:1.2.3.4', 'str')
+      const { rc } = await hook(plugin, 'rate_conn_enforce', c)
+      assert.equal(rc, undefined)
+      assert.match(c.results.get(plugin).err.join(' '), /rate_conn/)
+    })
+
+    it('enforce errors when no timestamps stored (fault injection)', async () => {
+      // real redis hGetAll yields {} (not falsy) for a missing hash
+      const orig = plugin.db.hGetAll
+      plugin.db.hGetAll = async () => null
+      try {
+        const { rc } = await hook(plugin, 'rate_conn_enforce', c)
+        assert.equal(rc, undefined)
+        assert.match(
+          c.results.get(plugin).err.join(' '),
+          /rate_conn:no_tstamps/,
         )
-      }, connection)
+      } finally {
+        plugin.db.hGetAll = orig
+      }
+    })
+  })
+
+  describe('rate_rcpt_sender / rate_rcpt_null / rate_rcpt', () => {
+    let c
+    beforeEach(() => {
+      plugin.cfg = {
+        rate_rcpt_sender: { 'spammer@x.com': '1/1m' },
+        rate_rcpt_null: { default: '1/1m' },
+        rate_rcpt: { 'victim@y.com': '1/1m' },
+        main: {},
+      }
+      c = conn()
+    })
+
+    it('rate_rcpt_sender penalizes when over', async () => {
+      c.transaction.mail_from = new Address('<spammer@x.com>')
+      await plugin.db.set('rate_rcpt_sender:spammer@x.com', 5)
+      const { rc, msg } = await hook(plugin, 'rate_rcpt_sender', c)
+      assert.equal(rc, DENYSOFT)
+      assert.equal(msg, 'rcpt rate limit exceeded')
+    })
+
+    it('rate_rcpt_null skips when no params', async () => {
+      assert.equal((await hook(plugin, 'rate_rcpt_null', c)).rc, undefined)
+    })
+
+    it('rate_rcpt_null skips a normal (non-null) recipient', async () => {
+      const { rc } = await hook(
+        plugin,
+        'rate_rcpt_null',
+        c,
+        new Address('<user@y.com>'),
+      )
+      assert.equal(rc, undefined)
+    })
+
+    it('rate_rcpt_null penalizes a userless recipient when over', async () => {
+      await plugin.db.set('rate_rcpt_null:', 5)
+      const { rc, msg } = await hook(plugin, 'rate_rcpt_null', c, [
+        new Address('<>'),
+      ])
+      assert.equal(rc, DENYSOFT)
+      assert.equal(msg, 'null recip rate limit')
+    })
+
+    it('rate_rcpt penalizes when over', async () => {
+      await plugin.db.set('rate_rcpt:victim@y.com', 5)
+      const { rc, msg } = await hook(plugin, 'rate_rcpt', c, [
+        new Address('<victim@y.com>'),
+      ])
+      assert.equal(rc, DENYSOFT)
+      assert.equal(msg, 'rate limit exceeded')
+    })
+
+    it('rate_rcpt passes when under', async () => {
+      const { rc } = await hook(plugin, 'rate_rcpt', c, [
+        new Address('<victim@y.com>'),
+      ])
+      assert.equal(rc, undefined)
     })
   })
 })

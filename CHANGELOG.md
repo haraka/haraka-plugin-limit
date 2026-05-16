@@ -4,6 +4,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
+- test: expanded test coverage
+- test: remove done callbacks in sync tests #73
+
 ### [1.2.7] - 2025-06-02
 
 - deps: bump versions
