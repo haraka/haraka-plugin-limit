@@ -4,7 +4,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
-### [1.2.8] - 2026-05-15
+### [1.3.0] - 2026-05-24
 
 - feat: add rate_outbound
 - fix: correctly handle IPv6 in get_host_key #76
@@ -116,4 +116,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 [1.2.5]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.5
 [1.2.6]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.6
 [1.2.7]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.7
-[1.2.8]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.8
+[1.3.0]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.3.0
