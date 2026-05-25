@@ -4,6 +4,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
+### [1.3.1] - 2026-05-24
+
+
 ### [1.3.0] - 2026-05-24
 
 - feat: add rate_outbound
@@ -117,3 +120,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 [1.2.6]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.6
 [1.2.7]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.7
 [1.3.0]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.3.0
+[1.3.1]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.3.1
