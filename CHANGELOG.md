@@ -4,10 +4,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
+### [1.3.0] - 2026-05-24
+
 - feat: add rate_outbound
-- fix: correctly handle IPv6 in get_host_key
+- fix: correctly handle IPv6 in get_host_key #76
+- dep(address-rfc2821): replaced with @haraka/email-address
+  - change: treat Address.address as property
 - deps(all): bump to latest
-- test: expanded test coverage
+- test: expanded test coverage #75
 - test: remove done callbacks in sync tests #73
 
 ### [1.2.7] - 2025-06-02
@@ -112,3 +116,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 [1.2.5]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.5
 [1.2.6]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.6
 [1.2.7]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.7
+[1.3.0]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.3.0

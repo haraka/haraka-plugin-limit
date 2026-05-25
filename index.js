@@ -340,7 +340,7 @@ exports.get_mail_key = function (type, mail) {
   if (!this.cfg[type] || !mail) return
 
   // Full e-mail address (e.g. smf@fsl.com)
-  const email = mail.address()
+  const email = mail.address
   if (this.cfg[type][email] || this.cfg[type][email] === 0) {
     return [email, this.cfg[type][email]]
   }
