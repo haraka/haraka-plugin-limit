@@ -474,9 +474,11 @@ exports.rate_rcpt_host_enforce = async function (next, connection) {
   const [key, value] = this.get_host_key('rate_rcpt_host', connection)
   if (!key || !value) return next()
 
-  const match = /^(\d+)/.exec(value)
-  const limit = parseInt(match[0], 10)
-  if (!limit) return next()
+  const limit = getLimit(value)
+  if (!limit) {
+    connection.results.add(this, { err: `rate_rcpt_host:syntax:${value}` })
+    return next()
+  }
 
   try {
     const result = await this.db.get(`rate_rcpt_host:${key}`)
@@ -581,9 +583,10 @@ exports.rate_rcpt_sender = async function (next, connection, params) {
 exports.rate_rcpt_null = async function (next, connection, params) {
   if (!params) return next()
   if (Array.isArray(params)) params = params[0]
-  if (params.user) return next()
+  // Only applies to messages from the null sender (DSN/MDN traffic).
+  // Key the counter by recipient.
+  if (!connection.transaction?.mail_from?.isNull?.()) return next()
 
-  // Message from the null sender
   const [key, value] = this.get_mail_key('rate_rcpt_null', params)
   connection.results.add(this, { rate_rcpt_null: value })
 
