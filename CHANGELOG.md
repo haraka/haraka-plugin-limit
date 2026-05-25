@@ -4,8 +4,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
-### [1.3.1] - 2026-05-24
+### [1.3.1] - 2026-05-26
 
+- fix(rate_rcpt_null): apply limit when MAIL FROM is null, not when the
+  recipient lacks a user-part; previously the documented protection was
+  bypassed for all ordinary DSN/MDN traffic
+- fix(rate_rcpt_host_enforce): handle malformed config values via the
+  shared getLimit() helper; emit an error and pass through vs crashing
 
 ### [1.3.0] - 2026-05-24
 

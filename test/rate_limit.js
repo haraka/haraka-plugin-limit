@@ -271,6 +271,16 @@ describe('redis-backed rate limits', () => {
       assert.equal(rc, undefined)
       assert.match(c.results.get(plugin).err.join(' '), /rate_rcpt_host/)
     })
+
+    it('enforce records syntax error and passes on a malformed limit value', async () => {
+      plugin.cfg.rate_rcpt_host['1.2.3.4'] = 'totally-bogus'
+      const { rc } = await hook(plugin, 'rate_rcpt_host_enforce', c)
+      assert.equal(rc, undefined)
+      assert.match(
+        c.results.get(plugin).err.join(' '),
+        /rate_rcpt_host:syntax:totally-bogus/,
+      )
+    })
   })
 
   describe('rate_conn', () => {
@@ -369,7 +379,9 @@ describe('redis-backed rate limits', () => {
       assert.equal((await hook(plugin, 'rate_rcpt_null', c)).rc, undefined)
     })
 
-    it('rate_rcpt_null skips a normal (non-null) recipient', async () => {
+    it('rate_rcpt_null skips when mail_from is not the null sender', async () => {
+      c.transaction.mail_from = new Address('<sender@x.com>')
+      await plugin.db.set('rate_rcpt_null:user@y.com', 5)
       const { rc } = await hook(
         plugin,
         'rate_rcpt_null',
@@ -379,10 +391,11 @@ describe('redis-backed rate limits', () => {
       assert.equal(rc, undefined)
     })
 
-    it('rate_rcpt_null penalizes a userless recipient when over', async () => {
-      await plugin.db.set('rate_rcpt_null:', 5)
+    it('rate_rcpt_null penalizes the recipient when mail_from is null and over', async () => {
+      c.transaction.mail_from = new Address('<>')
+      await plugin.db.set('rate_rcpt_null:user@y.com', 5)
       const { rc, msg } = await hook(plugin, 'rate_rcpt_null', c, [
-        new Address('<>'),
+        new Address('<user@y.com>'),
       ])
       assert.equal(rc, DENYSOFT)
       assert.equal(msg, 'null recip rate limit')
