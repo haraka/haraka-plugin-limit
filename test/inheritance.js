@@ -1,8 +1,8 @@
-const assert = require('node:assert')
+const assert = require('node:assert/strict')
 
 const { beforeEach, describe, it } = require('node:test')
 
-const fixtures = require('haraka-test-fixtures')
+const { makePlugin } = require('haraka-test-fixtures')
 
 const { bare, redisPlugin } = require('./helpers')
 
@@ -10,7 +10,7 @@ describe('inheritance', () => {
   let plugin
 
   beforeEach(() => {
-    plugin = new fixtures.plugin('index')
+    plugin = makePlugin('index', { register: false })
   })
 
   it('inherits redis', () => {

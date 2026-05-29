@@ -1,7 +1,6 @@
 # haraka-plugin-limit
 
-[![Tests][ci-img]][ci-url]
-[![Code Climate][clim-img]][clim-url]
+[![Test][ci-img]][ci-url] [![Cover][cov-img]][cov-url] [![Qlty][qlty-img]][qlty-url]
 
 Apply many types of limits to SMTP connections:
 
@@ -216,7 +215,11 @@ Applying strict connection and rate limits is an effective way to reduce spam de
 - Don't enforce limits early. I use karma and wait until DATA before disconnecting. By then, the score of the connection is determinate and I can return a 500 series code telling the remote not to try again.
 - enforce rate limits with your firewall instead
 
+<!-- leave these buried at the bottom of the document -->
+
 [ci-img]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci.yml/badge.svg
 [ci-url]: https://github.com/haraka/haraka-plugin-limit/actions/workflows/ci.yml
-[clim-img]: https://codeclimate.com/github/haraka/haraka-plugin-limit/badges/gpa.svg
-[clim-url]: https://codeclimate.com/github/haraka/haraka-plugin-limit
+[cov-img]: https://codecov.io/github/haraka/haraka-plugin-limit/coverage.svg
+[cov-url]: https://codecov.io/github/haraka/haraka-plugin-limit
+[qlty-img]: https://qlty.sh/gh/haraka/projects/haraka-plugin-limit/maintainability.svg
+[qlty-url]: https://qlty.sh/gh/haraka/projects/haraka-plugin-limit

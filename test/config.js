@@ -1,8 +1,6 @@
-const assert = require('assert')
+const assert = require('node:assert/strict')
 const { before, describe, it } = require('node:test')
-const path = require('path')
-
-const fixtures = require('haraka-test-fixtures')
+const { makePlugin } = require('haraka-test-fixtures')
 
 const { bare } = require('./helpers')
 
@@ -29,8 +27,7 @@ describe('plugin_setup', () => {
   let plugin
 
   before(() => {
-    plugin = new fixtures.plugin('index')
-    plugin.config = plugin.config.module_config(path.resolve('test'))
+    plugin = makePlugin('index', { configDir: __dirname, register: false })
   })
 
   it('loads config', () => {
@@ -46,7 +43,7 @@ describe('plugin_setup', () => {
   })
 
   it('registers every hook when all features are enabled', () => {
-    const p = new fixtures.plugin('index')
+    const p = makePlugin('index', { register: false })
     p.load_limit_ini = function () {
       this.cfg = {
         main: {},
