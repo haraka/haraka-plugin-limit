@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
+- test: refactored against test-fixtures 1.7.0
+
 ### [1.3.1] - 2026-05-26
 
 - fix(rate_rcpt_null): apply limit when MAIL FROM is null, not when the

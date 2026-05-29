@@ -6,25 +6,24 @@
   "files": [
     "config"
   ],
-  "directories": {
-    "test": "test"
-  },
   "dependencies": {
-    "haraka-constants": "^1.0.7",
-    "haraka-plugin-redis": "^2.0.11",
+    "haraka-constants": "^1.0.8",
+    "haraka-plugin-redis": "^2.1.0",
     "ipaddr.js": "^2.4.0"
   },
   "devDependencies": {
-    "@haraka/email-address": "^3.1.4",
-    "@haraka/eslint-config": "^2.0.4",
-    "haraka-test-fixtures": "^1.6.0"
+    "@haraka/email-address": "^3.1.5",
+    "@haraka/eslint-config": "^3.0.0",
+    "haraka-test-fixtures": "^1.7.0"
   },
   "scripts": {
+    "prepare": "git rev-parse --git-dir >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
     "format": "npm run prettier:fix && npm run lint:fix",
     "lint": "npx eslint *.js test",
     "lint:fix": "npx eslint *.js test --fix",
     "prettier": "npx prettier . --check",
     "prettier:fix": "npx prettier . --write --log-level=warn",
+    "qlty": "qlty smells --all",
     "test": "node --test test/*.js",
     "test:coverage": "node --test --experimental-test-coverage test/*.js",
     "test:coverage:lcov": "mkdir -p coverage && node --test --experimental-test-coverage --test-reporter=lcov --test-reporter-destination=coverage/lcov.info test/*.js",
