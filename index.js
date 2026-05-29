@@ -287,6 +287,7 @@ exports.get_host_key = function (type, connection) {
   }
 
   let ip
+  /* eslint no-useless-assignment: off */
   let is_ipv6 = false
   try {
     const parsed = ipaddr.parse(connection.remote.ip)
