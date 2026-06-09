@@ -4,6 +4,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
+### [1.3.2] - 2026-06-09
+
+#### Changed
+
+- refactored against test-fixtures 1.7.0 (#79)
+
+#### Other
+
+- batch of fixes
+
+
+- fix(rate_conn): honor sub-minute windows; compute the period on timestamps
+- fix(get_limit): a 0 (unlimited) history limit no longer falls through
+- fix(concurrency): re-arm the key TTL on decrement to stop a Redis key leak
+- fix: guard rate-limit key lookups against unparseable IPs and missing mail
+- fix: await background Redis writes so rejections can't crash the process
+- fix(getTTL): always return a number; reject unrecognized time units
+- fix(getOutDom): optional-chain the fallback domain
 - test: refactored against test-fixtures 1.7.0
 
 ### [1.3.1] - 2026-05-26
@@ -128,3 +146,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 [1.2.7]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.2.7
 [1.3.0]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.3.0
 [1.3.1]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.3.1
+[1.3.2]: https://github.com/haraka/haraka-plugin-limit/releases/tag/v1.3.2
