@@ -55,6 +55,12 @@ describe('outbound', () => {
       assert.equal(rc, undefined)
     })
 
+    it('does not bucket a missing domain', async () => {
+      const { rc } = await hook(plugin, 'outbound_increment', {})
+      assert.equal(rc, undefined)
+      assert.equal(await plugin.db.exists('outbound-rate:undefined'), 0)
+    })
+
     it('concurrency lifecycle: TOTAL stays correct across deliver/delay/decrement', async () => {
       plugin.cfg.outbound['slow.com'] = 1
 
@@ -104,9 +110,10 @@ describe('outbound', () => {
       assert.equal(rc, undefined)
     })
 
-    it('is safe when hmail is null', async () => {
+    it('is safe when hmail is null and buckets nothing', async () => {
       const { rc } = await hook(plugin, 'outbound_decrement', null)
       assert.equal(rc, undefined)
+      assert.equal(await plugin.db.exists('outbound-rate:undefined'), 0)
     })
 
     it('swallows a redis error (fault injection)', async () => {

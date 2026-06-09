@@ -68,6 +68,11 @@ exports.register = function () {
     this.register_hook('init_master', 'init_redis_plugin')
     this.register_hook('init_child', 'init_redis_plugin')
   }
+
+  // registered after init_redis_plugin so this.db is ready when it runs
+  if (this.cfg.concurrency.enabled) {
+    this.register_hook('init_master', 'prune_concurrency_keys')
+  }
 }
 
 exports.load_limit_ini = function () {
@@ -140,6 +145,7 @@ exports.max_recipients = function (next, connection, params) {
   if (!this.cfg.recipients) return next() // disabled in config
 
   const max = this.get_limit('recipients', connection)
+  if (Number(max) === 0) return next() // 0 = unlimited
   if (!max || isNaN(max)) return next()
 
   const c = connection.rcpt_count
@@ -193,7 +199,7 @@ exports.get_limit = function (type, connection) {
     if (history !== undefined) return history
   }
 
-  return this.cfg[type].max || this.cfg[type].default
+  return this.cfg[type].max ?? this.cfg[type].default
 }
 
 exports.conn_concur_incr = async function (next, connection) {
@@ -231,8 +237,34 @@ exports.get_concurrency_key = function (connection) {
   return `concurrency|${connection.remote.ip}`
 }
 
+// One-time sweep for keys leaked by versions that decremented an
+// already-expired concurrency key (see AUD-04). Both incr and decr now arm a
+// TTL, so a live key always has one; a TTL-less key is a leak artifact. Arm a
+// TTL rather than delete so an in-flight connection's counter is never dropped.
+exports.prune_concurrency_keys = async function (next) {
+  if (!this.db) return next()
+
+  try {
+    let cursor = '0'
+    do {
+      const res = await this.db.scan(cursor, {
+        MATCH: 'concurrency|*',
+        COUNT: 100,
+      })
+      cursor = res.cursor
+      for (const key of res.keys) {
+        if ((await this.db.ttl(key)) === -1) await this.db.expire(key, 3 * 60)
+      }
+    } while (cursor !== '0')
+  } catch (err) {
+    this.logerror(`prune_concurrency_keys: ${err}`)
+  }
+  next()
+}
+
 exports.check_concurrency = function (next, connection) {
   const max = this.get_limit('concurrency', connection)
+  if (Number(max) === 0) return next() // 0 = unlimited, not a misconfiguration
   if (!max || isNaN(max)) {
     connection.results.add(this, { err: 'concurrency: no limit?!' })
     return next()
@@ -631,6 +663,7 @@ exports.outbound_increment = async function (next, hmail) {
   if (!this.db) return next()
 
   const outDom = getOutDom(hmail)
+  if (!outDom) return next() // no domain: nothing to key a counter on
   const outKey = getOutKey(outDom)
 
   try {
@@ -657,8 +690,11 @@ exports.outbound_increment = async function (next, hmail) {
 exports.outbound_decrement = async function (next, hmail) {
   if (!this.db) return next()
 
+  const domain = getOutDom(hmail)
+  if (!domain) return next() // no domain: nothing to decrement
+
   try {
-    await this.db.hIncrBy(getOutKey(getOutDom(hmail)), 'TOTAL', -1)
+    await this.db.hIncrBy(getOutKey(domain), 'TOTAL', -1)
   } catch (err) {
     this.logerror(`outbound_decrement: ${err}`)
   }

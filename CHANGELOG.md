@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - fix(rate_conn): honor sub-minute windows; compute the period on timestamps
 - fix(get_limit): a 0 (unlimited) history limit no longer falls through
 - fix(concurrency): re-arm the key TTL on decrement to stop a Redis key leak
+- feat(concurrency): sweep pre-existing TTL-less concurrency keys at startup
 - fix: guard rate-limit key lookups against unparseable IPs and missing mail
 - fix: await background Redis writes so rejections can't crash the process
 - fix(getTTL): always return a number; reject unrecognized time units
