@@ -359,6 +359,61 @@ describe('redis-backed rate limits', () => {
       assert.equal((await plugin.db.hGetAll(key))[stale], undefined)
     })
 
+    it('enforce prunes multiple stale timestamps in a single hDel', async () => {
+      plugin.cfg.rate_conn['1.2.3.4'] = '5/30s'
+      const key = 'rate_conn:1.2.3.4'
+      const now = Date.now()
+      const stale1 = String(now - 60000)
+      const stale2 = String(now - 45000)
+      await plugin.db.hSet(key, stale1, '1')
+      await plugin.db.hSet(key, stale2, '1')
+      await plugin.db.hSet(key, String(now), '1')
+
+      const orig = plugin.db.hDel.bind(plugin.db)
+      let calls = 0
+      plugin.db.hDel = (...args) => {
+        calls++
+        return orig(...args)
+      }
+      try {
+        await hook(plugin, 'rate_conn_enforce', c)
+      } finally {
+        plugin.db.hDel = orig
+      }
+
+      const remaining = await plugin.db.hGetAll(key)
+      assert.equal(remaining[stale1], undefined)
+      assert.equal(remaining[stale2], undefined)
+      assert.equal(remaining[String(now)], '1')
+      assert.equal(calls, 1) // batched, not one round-trip per stale field
+    })
+
+    it('enforce flags an invalid time unit instead of over-counting', async () => {
+      plugin.cfg.rate_conn['1.2.3.4'] = '5/2x' // valid limit, bad unit
+      const key = 'rate_conn:1.2.3.4'
+      const now = Date.now()
+      // more events than the limit: with a NaN window these would all count
+      for (let i = 0; i < 9; i++)
+        await plugin.db.hSet(key, String(now + i), '1')
+      const { rc } = await hook(plugin, 'rate_conn_enforce', c)
+      assert.equal(rc, undefined)
+      assert.match(
+        c.results.get(plugin).err.join(' '),
+        /rate_conn:syntax:5\/2x/,
+      )
+    })
+
+    it('incr flags an invalid time unit and stores nothing', async () => {
+      plugin.cfg.rate_conn['1.2.3.4'] = '5/2x'
+      const { rc } = await hook(plugin, 'rate_conn_incr', c)
+      assert.equal(rc, undefined)
+      assert.match(
+        c.results.get(plugin).err.join(' '),
+        /rate_conn:syntax:5\/2x/,
+      )
+      assert.equal(await plugin.db.exists('rate_conn:1.2.3.4'), 0)
+    })
+
     it('enforce passes (no throw) when the ip is unparseable', async () => {
       const badConn = conn({ ip: 'not-an-ip', host: '' })
       const { rc } = await hook(plugin, 'rate_conn_enforce', badConn)

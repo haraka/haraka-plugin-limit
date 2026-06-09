@@ -255,21 +255,23 @@ describe('connection concurrency (redis)', () => {
     }
   })
 
-  it('prune arms a ttl on leaked (ttl-less) concurrency keys', async () => {
-    await plugin.db.set('concurrency|9.9.9.9', -1) // leaked: no ttl
+  it('prune arms a ttl on leaked (ttl-less) keys it owns', async () => {
+    await plugin.db.set('concurrency|9.9.9.9', -1) // leaked concurrency key
     await plugin.db.set('concurrency|8.8.8.8', 3)
     await plugin.db.expire('concurrency|8.8.8.8', 120) // healthy: has ttl
+    await plugin.db.hSet('outbound-rate:undefined', 'TOTAL', '-1') // leaked bucket
     await plugin.db.set('other-plugin|key', 1) // unrelated: must be untouched
 
-    await new Promise((resolve) => plugin.prune_concurrency_keys(resolve))
+    await new Promise((resolve) => plugin.prune_stale_keys(resolve))
 
     assert.ok((await plugin.db.ttl('concurrency|9.9.9.9')) > 0)
     assert.ok((await plugin.db.ttl('concurrency|8.8.8.8')) > 0)
+    assert.ok((await plugin.db.ttl('outbound-rate:undefined')) > 0)
     assert.equal(await plugin.db.ttl('other-plugin|key'), -1)
   })
 
   it('prune is a no-op without a db', async () => {
     const noDb = bare({ concurrency: {} })
-    await new Promise((resolve) => noDb.prune_concurrency_keys(resolve))
+    await new Promise((resolve) => noDb.prune_stale_keys(resolve))
   })
 })

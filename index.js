@@ -67,11 +67,8 @@ exports.register = function () {
   if (needs_redis) {
     this.register_hook('init_master', 'init_redis_plugin')
     this.register_hook('init_child', 'init_redis_plugin')
-  }
-
-  // registered after init_redis_plugin so this.db is ready when it runs
-  if (this.cfg.concurrency.enabled) {
-    this.register_hook('init_master', 'prune_concurrency_keys')
+    // after init_redis_plugin so this.db is ready when it runs
+    this.register_hook('init_master', 'prune_stale_keys')
   }
 }
 
@@ -237,27 +234,34 @@ exports.get_concurrency_key = function (connection) {
   return `concurrency|${connection.remote.ip}`
 }
 
-// One-time sweep for keys leaked by versions that decremented an
-// already-expired concurrency key (see AUD-04). Both incr and decr now arm a
-// TTL, so a live key always has one; a TTL-less key is a leak artifact. Arm a
-// TTL rather than delete so an in-flight connection's counter is never dropped.
-exports.prune_concurrency_keys = async function (next) {
+// Key families where every live key carries a TTL (incr and decr both arm
+// one). A TTL-less key is therefore an orphan leaked by older versions: a
+// decremented-after-expiry concurrency key (AUD-04), or an outbound bucket
+// from a domain-less decrement. The paired ttl is the family's own lifetime.
+const stale_key_families = [
+  { match: 'concurrency|*', ttl: 3 * 60 },
+  { match: 'outbound-rate:*', ttl: 300 },
+]
+
+// One-time startup sweep: arm the family TTL on any orphan so it self-clears.
+// Arm rather than delete so an in-flight key's counter is never dropped; an
+// active key simply re-arms its own TTL on the next write.
+exports.prune_stale_keys = async function (next) {
   if (!this.db) return next()
 
   try {
-    let cursor = '0'
-    do {
-      const res = await this.db.scan(cursor, {
-        MATCH: 'concurrency|*',
-        COUNT: 100,
-      })
-      cursor = res.cursor
-      for (const key of res.keys) {
-        if ((await this.db.ttl(key)) === -1) await this.db.expire(key, 3 * 60)
-      }
-    } while (cursor !== '0')
+    for (const { match, ttl } of stale_key_families) {
+      let cursor = '0'
+      do {
+        const res = await this.db.scan(cursor, { MATCH: match, COUNT: 100 })
+        cursor = res.cursor
+        for (const key of res.keys) {
+          if ((await this.db.ttl(key)) === -1) await this.db.expire(key, ttl)
+        }
+      } while (cursor !== '0')
+    }
   } catch (err) {
-    this.logerror(`prune_concurrency_keys: ${err}`)
+    this.logerror(`prune_stale_keys: ${err}`)
   }
   next()
 }
@@ -540,10 +544,16 @@ exports.rate_conn_incr = async function (next, connection) {
   const [key, value] = this.get_host_key('rate_conn', connection) ?? []
   if (!key || !value) return next()
 
+  const ttl = getTTL(value)
+  if (!ttl) {
+    connection.results.add(this, { err: `rate_conn:syntax:${value}` })
+    return next()
+  }
+
   try {
     await this.db.hIncrBy(`rate_conn:${key}`, (+new Date()).toString(), 1)
     // extend key expiration on every new connection
-    await this.db.expire(`rate_conn:${key}`, getTTL(value) * 2)
+    await this.db.expire(`rate_conn:${key}`, ttl * 2)
   } catch (err) {
     connection.results.add(this, { err })
   }
@@ -557,7 +567,8 @@ exports.rate_conn_enforce = async function (next, connection) {
   if (!key || !value) return next()
 
   const limit = getLimit(value)
-  if (!limit) {
+  const ttl = getTTL(value)
+  if (!limit || !ttl) {
     connection.results.add(this, { err: `rate_conn:syntax:${value}` })
     return next()
   }
@@ -569,18 +580,19 @@ exports.rate_conn_enforce = async function (next, connection) {
       return next()
     }
 
-    const periodStartTs = Date.now() - getTTL(value) * 1000
+    const periodStartTs = Date.now() - ttl * 1000
 
+    const stale = []
     let connections_in_ttl_period = 0
     for (const ts of Object.keys(tstamps)) {
       if (parseInt(ts, 10) < periodStartTs) {
-        // older than ttl
-        await this.db.hDel(`rate_conn:${key}`, ts)
+        stale.push(ts)
         continue
       }
       connections_in_ttl_period =
         connections_in_ttl_period + parseInt(tstamps[ts], 10)
     }
+    if (stale.length) await this.db.hDel(`rate_conn:${key}`, stale)
     connection.results.add(this, {
       rate_conn: `${connections_in_ttl_period}:${value}`,
     })
