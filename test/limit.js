@@ -103,6 +103,19 @@ describe('check_concurrency', () => {
     assert.equal(rc, undefined)
     assert.equal(c.results.get(plugin).err.join(' '), 'concurrent.unset')
   })
+
+  it('treats a 0 (unlimited) history limit as unlimited, not an error', async () => {
+    plugin.cfg = {
+      concurrency: { max: 5 },
+      concurrency_history: { enabled: true, plugin: 'karma', good: 0 },
+      main: {},
+    }
+    c.results.add({ name: 'karma' }, { history: 1 }) // good reputation
+    c.results.add(plugin, { concurrent_count: 5 })
+    const { rc } = await hook(plugin, 'check_concurrency', c)
+    assert.equal(rc, undefined)
+    assert.equal(c.results.get(plugin).err.length, 0)
+  })
 })
 
 describe('get_limit', () => {
@@ -111,6 +124,21 @@ describe('get_limit', () => {
     const c = conn()
     c.relaying = true
     assert.equal(plugin.get_limit('recipients', c), 100)
+  })
+
+  it('respects an explicit 0 (unlimited) max over the default', () => {
+    const plugin = bare({ concurrency: { max: 0, default: 5 } })
+    assert.equal(plugin.get_limit('concurrency', conn()), 0)
+  })
+
+  it('returns a 0 (unlimited) history limit instead of the configured max', () => {
+    const plugin = bare({
+      concurrency: { max: 5 },
+      concurrency_history: { enabled: true, plugin: 'karma', good: 0 },
+    })
+    const c = conn()
+    c.results.add({ name: 'karma' }, { history: 1 }) // good reputation
+    assert.equal(plugin.get_limit('concurrency', c), 0)
   })
 })
 
@@ -205,5 +233,45 @@ describe('connection concurrency (redis)', () => {
     await plugin.db.set('concurrency|1.2.3.4', 'not-an-int')
     await hook(plugin, 'conn_concur_decr', c)
     assert.match(c.results.get(plugin).err.join(' '), /conn_concur_decr/)
+  })
+
+  it('decr sets a ttl so a key recreated after expiry cannot leak', async () => {
+    // no prior key: mimics a connection that outlived the incr-set TTL
+    await hook(plugin, 'conn_concur_decr', c)
+    const ttl = await plugin.db.ttl('concurrency|1.2.3.4')
+    assert.ok(ttl > 0, `expected a positive ttl, got ${ttl}`)
+  })
+
+  it('incr records an error when expire rejects (fault injection)', async () => {
+    const orig = plugin.db.expire
+    plugin.db.expire = async () => {
+      throw new Error('expire boom')
+    }
+    try {
+      await hook(plugin, 'conn_concur_incr', c)
+      assert.match(c.results.get(plugin).err.join(' '), /expire boom/)
+    } finally {
+      plugin.db.expire = orig
+    }
+  })
+
+  it('prune arms a ttl on leaked (ttl-less) keys it owns', async () => {
+    await plugin.db.set('concurrency|9.9.9.9', -1) // leaked concurrency key
+    await plugin.db.set('concurrency|8.8.8.8', 3)
+    await plugin.db.expire('concurrency|8.8.8.8', 120) // healthy: has ttl
+    await plugin.db.hSet('outbound-rate:undefined', 'TOTAL', '-1') // leaked bucket
+    await plugin.db.set('other-plugin|key', 1) // unrelated: must be untouched
+
+    await new Promise((resolve) => plugin.prune_stale_keys(resolve))
+
+    assert.ok((await plugin.db.ttl('concurrency|9.9.9.9')) > 0)
+    assert.ok((await plugin.db.ttl('concurrency|8.8.8.8')) > 0)
+    assert.ok((await plugin.db.ttl('outbound-rate:undefined')) > 0)
+    assert.equal(await plugin.db.ttl('other-plugin|key'), -1)
+  })
+
+  it('prune is a no-op without a db', async () => {
+    const noDb = bare({ concurrency: {} })
+    await new Promise((resolve) => noDb.prune_stale_keys(resolve))
   })
 })

@@ -67,6 +67,8 @@ exports.register = function () {
   if (needs_redis) {
     this.register_hook('init_master', 'init_redis_plugin')
     this.register_hook('init_child', 'init_redis_plugin')
+    // after init_redis_plugin so this.db is ready when it runs
+    this.register_hook('init_master', 'prune_stale_keys')
   }
 }
 
@@ -140,6 +142,7 @@ exports.max_recipients = function (next, connection, params) {
   if (!this.cfg.recipients) return next() // disabled in config
 
   const max = this.get_limit('recipients', connection)
+  if (Number(max) === 0) return next() // 0 = unlimited
   if (!max || isNaN(max)) return next()
 
   const c = connection.rcpt_count
@@ -190,10 +193,10 @@ exports.get_limit = function (type, connection) {
 
   if (this.cfg[`${type}_history`]) {
     const history = this.get_history_limit(type, connection)
-    if (history) return history
+    if (history !== undefined) return history
   }
 
-  return this.cfg[type].max || this.cfg[type].default
+  return this.cfg[type].max ?? this.cfg[type].default
 }
 
 exports.conn_concur_incr = async function (next, connection) {
@@ -217,10 +220,10 @@ exports.conn_concur_incr = async function (next, connection) {
       connection.results.add(this, {
         msg: `resetting concurrent ${count} to 1`,
       })
-      this.db.set(dbkey, 1)
+      await this.db.set(dbkey, 1)
     }
 
-    this.db.expire(dbkey, 3 * 60) // 3 minute lifetime
+    await this.db.expire(dbkey, 3 * 60) // 3 minute lifetime
   } catch (err) {
     connection.results.add(this, { err: `conn_concur_incr:${err}` })
   }
@@ -231,8 +234,41 @@ exports.get_concurrency_key = function (connection) {
   return `concurrency|${connection.remote.ip}`
 }
 
+// Key families where every live key carries a TTL (incr and decr both arm
+// one). A TTL-less key is therefore an orphan leaked by older versions: a
+// decremented-after-expiry concurrency key (AUD-04), or an outbound bucket
+// from a domain-less decrement. The paired ttl is the family's own lifetime.
+const stale_key_families = [
+  { match: 'concurrency|*', ttl: 3 * 60 },
+  { match: 'outbound-rate:*', ttl: 300 },
+]
+
+// One-time startup sweep: arm the family TTL on any orphan so it self-clears.
+// Arm rather than delete so an in-flight key's counter is never dropped; an
+// active key simply re-arms its own TTL on the next write.
+exports.prune_stale_keys = async function (next) {
+  if (!this.db) return next()
+
+  try {
+    for (const { match, ttl } of stale_key_families) {
+      let cursor = '0'
+      do {
+        const res = await this.db.scan(cursor, { MATCH: match, COUNT: 100 })
+        cursor = res.cursor
+        for (const key of res.keys) {
+          if ((await this.db.ttl(key)) === -1) await this.db.expire(key, ttl)
+        }
+      } while (cursor !== '0')
+    }
+  } catch (err) {
+    this.logerror(`prune_stale_keys: ${err}`)
+  }
+  next()
+}
+
 exports.check_concurrency = function (next, connection) {
   const max = this.get_limit('concurrency', connection)
+  if (Number(max) === 0) return next() // 0 = unlimited, not a misconfiguration
   if (!max || isNaN(max)) {
     connection.results.add(this, { err: 'concurrency: no limit?!' })
     return next()
@@ -274,6 +310,9 @@ exports.conn_concur_decr = async function (next, connection) {
   try {
     const dbkey = this.get_concurrency_key(connection)
     await this.db.incrBy(dbkey, -1)
+    // a late decrement can recreate a key whose incr-set expiry already
+    // lapsed (connections outliving the 3m TTL); re-arm it so it can't leak
+    await this.db.expire(dbkey, 3 * 60)
   } catch (err) {
     connection.results.add(this, { err: `conn_concur_decr:${err}` })
   }
@@ -325,7 +364,7 @@ exports.get_host_key = function (type, connection) {
 
   if (this.cfg[`${type}_history`]) {
     const history = this.get_history_limit(type, connection)
-    if (history) return [ip, history]
+    if (history !== undefined) return [ip, history]
   }
 
   // Custom Default
@@ -393,7 +432,7 @@ function getTTL(value) {
   const qty = match[2]
   const units = match[3]
 
-  let ttl = qty ? qty : 60 // Default 60s
+  let ttl = qty ? parseInt(qty, 10) : 60 // Default 60s
   if (!units) return ttl
 
   // Unit
@@ -410,7 +449,7 @@ function getTTL(value) {
       ttl *= 60 * 60 * 24 // days
       break
     default:
-      return ttl
+      return // unrecognized unit: signal a syntax error to the caller
   }
   return ttl
 }
@@ -446,7 +485,7 @@ exports.rate_limit = async function (connection, key, value) {
 
   try {
     const newval = await this.db.incr(key)
-    if (newval === 1) this.db.expire(key, ttl)
+    if (newval === 1) await this.db.expire(key, ttl)
     return parseInt(newval, 10) > limit // boolean
   } catch (err) {
     connection.results.add(this, { err: `${key}:${err}` })
@@ -456,7 +495,7 @@ exports.rate_limit = async function (connection, key, value) {
 exports.rate_rcpt_host_incr = async function (next, connection) {
   if (!this.db) return next()
 
-  const [key, value] = this.get_host_key('rate_rcpt_host', connection)
+  const [key, value] = this.get_host_key('rate_rcpt_host', connection) ?? []
   if (!key || !value) return next()
 
   try {
@@ -472,7 +511,7 @@ exports.rate_rcpt_host_incr = async function (next, connection) {
 exports.rate_rcpt_host_enforce = async function (next, connection) {
   if (!this.db) return next()
 
-  const [key, value] = this.get_host_key('rate_rcpt_host', connection)
+  const [key, value] = this.get_host_key('rate_rcpt_host', connection) ?? []
   if (!key || !value) return next()
 
   const limit = getLimit(value)
@@ -502,13 +541,19 @@ exports.rate_rcpt_host_enforce = async function (next, connection) {
 exports.rate_conn_incr = async function (next, connection) {
   if (!this.db) return next()
 
-  const [key, value] = this.get_host_key('rate_conn', connection)
+  const [key, value] = this.get_host_key('rate_conn', connection) ?? []
   if (!key || !value) return next()
+
+  const ttl = getTTL(value)
+  if (!ttl) {
+    connection.results.add(this, { err: `rate_conn:syntax:${value}` })
+    return next()
+  }
 
   try {
     await this.db.hIncrBy(`rate_conn:${key}`, (+new Date()).toString(), 1)
     // extend key expiration on every new connection
-    await this.db.expire(`rate_conn:${key}`, getTTL(value) * 2)
+    await this.db.expire(`rate_conn:${key}`, ttl * 2)
   } catch (err) {
     connection.results.add(this, { err })
   }
@@ -518,11 +563,12 @@ exports.rate_conn_incr = async function (next, connection) {
 exports.rate_conn_enforce = async function (next, connection) {
   if (!this.db) return next()
 
-  const [key, value] = this.get_host_key('rate_conn', connection)
+  const [key, value] = this.get_host_key('rate_conn', connection) ?? []
   if (!key || !value) return next()
 
   const limit = getLimit(value)
-  if (!limit) {
+  const ttl = getTTL(value)
+  if (!limit || !ttl) {
     connection.results.add(this, { err: `rate_conn:syntax:${value}` })
     return next()
   }
@@ -534,20 +580,19 @@ exports.rate_conn_enforce = async function (next, connection) {
       return next()
     }
 
-    const d = new Date()
-    d.setMinutes(d.getMinutes() - getTTL(value) / 60)
-    const periodStartTs = +d // date as integer
+    const periodStartTs = Date.now() - ttl * 1000
 
+    const stale = []
     let connections_in_ttl_period = 0
     for (const ts of Object.keys(tstamps)) {
       if (parseInt(ts, 10) < periodStartTs) {
-        // older than ttl
-        this.db.hDel(`rate_conn:${key}`, ts)
+        stale.push(ts)
         continue
       }
       connections_in_ttl_period =
         connections_in_ttl_period + parseInt(tstamps[ts], 10)
     }
+    if (stale.length) await this.db.hDel(`rate_conn:${key}`, stale)
     connection.results.add(this, {
       rate_conn: `${connections_in_ttl_period}:${value}`,
     })
@@ -564,10 +609,9 @@ exports.rate_conn_enforce = async function (next, connection) {
 }
 
 exports.rate_rcpt_sender = async function (next, connection, params) {
-  const [key, value] = this.get_mail_key(
-    'rate_rcpt_sender',
-    connection.transaction.mail_from,
-  )
+  const [key, value] =
+    this.get_mail_key('rate_rcpt_sender', connection.transaction.mail_from) ??
+    []
   connection.results.add(this, { rate_rcpt_sender: value })
 
   const over = await this.rate_limit(
@@ -588,7 +632,7 @@ exports.rate_rcpt_null = async function (next, connection, params) {
   // Key the counter by recipient.
   if (!connection.transaction?.mail_from?.isNull?.()) return next()
 
-  const [key, value] = this.get_mail_key('rate_rcpt_null', params)
+  const [key, value] = this.get_mail_key('rate_rcpt_null', params) ?? []
   connection.results.add(this, { rate_rcpt_null: value })
 
   const over = await this.rate_limit(connection, `rate_rcpt_null:${key}`, value)
@@ -602,7 +646,7 @@ exports.rate_rcpt = async function (next, connection, params) {
   const plugin = this
   if (Array.isArray(params)) params = params[0]
 
-  const [key, value] = plugin.get_mail_key('rate_rcpt', params)
+  const [key, value] = plugin.get_mail_key('rate_rcpt', params) ?? []
   connection.results.add(plugin, { rate_rcpt: value })
 
   const over = await plugin.rate_limit(connection, `rate_rcpt:${key}`, value)
@@ -620,7 +664,7 @@ exports.rate_rcpt = async function (next, connection, params) {
 function getOutDom(hmail) {
   // outbound isn't internally consistent using hmail.domain and hmail.todo.domain.
   // TODO: fix haraka/Haraka/outbound/HMailItem to be internally consistent.
-  return hmail?.todo?.domain || hmail.domain
+  return hmail?.todo?.domain || hmail?.domain
 }
 
 function getOutKey(domain) {
@@ -631,12 +675,13 @@ exports.outbound_increment = async function (next, hmail) {
   if (!this.db) return next()
 
   const outDom = getOutDom(hmail)
+  if (!outDom) return next() // no domain: nothing to key a counter on
   const outKey = getOutKey(outDom)
 
   try {
     let count = await this.db.hIncrBy(outKey, 'TOTAL', 1)
 
-    this.db.expire(outKey, 300) // 5 min expire
+    await this.db.expire(outKey, 300) // 5 min expire
 
     if (!this.cfg.outbound[outDom]) return next()
     const limit = parseInt(this.cfg.outbound[outDom], 10)
@@ -645,7 +690,7 @@ exports.outbound_increment = async function (next, hmail) {
     count = parseInt(count, 10)
     if (count <= limit) return next()
 
-    this.db.hIncrBy(outKey, 'TOTAL', -1) // undo the increment
+    await this.db.hIncrBy(outKey, 'TOTAL', -1) // undo the increment
     const delay = this.cfg.outbound.delay || 30
     next(constants.delay, delay)
   } catch (err) {
@@ -654,10 +699,17 @@ exports.outbound_increment = async function (next, hmail) {
   }
 }
 
-exports.outbound_decrement = function (next, hmail) {
+exports.outbound_decrement = async function (next, hmail) {
   if (!this.db) return next()
 
-  this.db.hIncrBy(getOutKey(getOutDom(hmail)), 'TOTAL', -1)
+  const domain = getOutDom(hmail)
+  if (!domain) return next() // no domain: nothing to decrement
+
+  try {
+    await this.db.hIncrBy(getOutKey(domain), 'TOTAL', -1)
+  } catch (err) {
+    this.logerror(`outbound_decrement: ${err}`)
+  }
   next()
 }
 
@@ -676,7 +728,7 @@ exports.rate_outbound = async function (next, hmail) {
 
   try {
     const count = await this.db.incr(`rate_outbound:${key}`)
-    if (count === 1) this.db.expire(`rate_outbound:${key}`, ttl)
+    if (count === 1) await this.db.expire(`rate_outbound:${key}`, ttl)
     if (parseInt(count, 10) > limit)
       return next(constants.delay, parseInt(ttl, 10))
     next()
