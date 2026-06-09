@@ -112,6 +112,16 @@ describe('get_limit', () => {
     c.relaying = true
     assert.equal(plugin.get_limit('recipients', c), 100)
   })
+
+  it('returns a 0 (unlimited) history limit instead of the configured max', () => {
+    const plugin = bare({
+      concurrency: { max: 5 },
+      concurrency_history: { enabled: true, plugin: 'karma', good: 0 },
+    })
+    const c = conn()
+    c.results.add({ name: 'karma' }, { history: 1 }) // good reputation
+    assert.equal(plugin.get_limit('concurrency', c), 0)
+  })
 })
 
 describe('get_concurrency_key', () => {
@@ -205,5 +215,25 @@ describe('connection concurrency (redis)', () => {
     await plugin.db.set('concurrency|1.2.3.4', 'not-an-int')
     await hook(plugin, 'conn_concur_decr', c)
     assert.match(c.results.get(plugin).err.join(' '), /conn_concur_decr/)
+  })
+
+  it('decr sets a ttl so a key recreated after expiry cannot leak', async () => {
+    // no prior key: mimics a connection that outlived the incr-set TTL
+    await hook(plugin, 'conn_concur_decr', c)
+    const ttl = await plugin.db.ttl('concurrency|1.2.3.4')
+    assert.ok(ttl > 0, `expected a positive ttl, got ${ttl}`)
+  })
+
+  it('incr records an error when expire rejects (fault injection)', async () => {
+    const orig = plugin.db.expire
+    plugin.db.expire = async () => {
+      throw new Error('expire boom')
+    }
+    try {
+      await hook(plugin, 'conn_concur_incr', c)
+      assert.match(c.results.get(plugin).err.join(' '), /expire boom/)
+    } finally {
+      plugin.db.expire = orig
+    }
   })
 })

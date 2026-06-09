@@ -3,6 +3,7 @@ const assert = require('node:assert/strict')
 const { after, before, beforeEach, describe, it } = require('node:test')
 
 const constants = require('haraka-constants')
+const { assertResult } = require('haraka-test-fixtures')
 
 const { Address, bare, conn, hook, redisPlugin } = require('./helpers')
 
@@ -100,6 +101,16 @@ describe('get_host_key', () => {
     const c = conn({ ip: '8.8.8.8', host: '' })
     c.results.add({ name: 'karma' }, { history: 1 }) // good
     assert.deepEqual(plugin.get_host_key('rate_conn', c), ['8.8.8.8', 11])
+  })
+
+  it('a 0 (unlimited) history limit overrides the configured default', () => {
+    const plugin = bare({
+      rate_conn: { default: 5 },
+      rate_conn_history: { enabled: true, plugin: 'karma', good: 0 },
+    })
+    const c = conn({ ip: '8.8.8.8', host: '' })
+    c.results.add({ name: 'karma' }, { history: 1 }) // good
+    assert.deepEqual(plugin.get_host_key('rate_conn', c), ['8.8.8.8', 0])
   })
 })
 
@@ -199,11 +210,16 @@ describe('redis-backed rate limits', () => {
       assert.match(c.results.get(plugin).err.join(' '), /syntax error/)
     })
 
-    for (const value of ['5/2m', '5/2h', '5/2d', '5/2s', '5/2x']) {
+    for (const value of ['5/2m', '5/2h', '5/2d', '5/2s']) {
       it(`parses "${value}" and stays under the limit`, async () => {
         assert.equal(await plugin.rate_limit(c, `k:${value}`, value), false)
       })
     }
+
+    it('rejects an unrecognized time unit as a syntax error', async () => {
+      assert.equal(await plugin.rate_limit(c, 'k', '5/2x'), undefined)
+      assert.match(c.results.get(plugin).err.join(' '), /syntax error/)
+    })
 
     it('trips when the count exceeds the limit', async () => {
       await plugin.db.set('hot', 2)
@@ -239,7 +255,7 @@ describe('redis-backed rate limits', () => {
     it('incr records an error on a real WRONGTYPE', async () => {
       await plugin.db.hSet('rate_rcpt_host:1.2.3.4', 'f', '1')
       await hook(plugin, 'rate_rcpt_host_incr', c)
-      assert.ok(c.results.get(plugin).err.length)
+      assertResult(c, plugin, 'err')
     })
 
     it('enforce passes when no counter is stored', async () => {
@@ -301,7 +317,7 @@ describe('redis-backed rate limits', () => {
     it('incr records an error on a real WRONGTYPE', async () => {
       await plugin.db.set('rate_conn:1.2.3.4', 'str')
       await hook(plugin, 'rate_conn_incr', c)
-      assert.ok(c.results.get(plugin).err.length)
+      assertResult(c, plugin, 'err')
     })
 
     it('enforce flags a bad limit syntax', async () => {
@@ -329,6 +345,24 @@ describe('redis-backed rate limits', () => {
       const { rc, msg } = await hook(plugin, 'rate_conn_enforce', c)
       assert.equal(rc, DENYSOFTDISCONNECT)
       assert.equal(msg, 'connection rate limit exceeded')
+    })
+
+    it('enforce honors a sub-minute window (30s, not a whole minute)', async () => {
+      plugin.cfg.rate_conn['1.2.3.4'] = '5/30s'
+      const key = 'rate_conn:1.2.3.4'
+      const now = Date.now()
+      const stale = String(now - 45000) // 45s ago: outside the 30s window
+      await plugin.db.hSet(key, stale, '1')
+      await plugin.db.hSet(key, String(now), '1')
+      const { rc } = await hook(plugin, 'rate_conn_enforce', c)
+      assert.equal(rc, undefined)
+      assert.equal((await plugin.db.hGetAll(key))[stale], undefined)
+    })
+
+    it('enforce passes (no throw) when the ip is unparseable', async () => {
+      const badConn = conn({ ip: 'not-an-ip', host: '' })
+      const { rc } = await hook(plugin, 'rate_conn_enforce', badConn)
+      assert.equal(rc, undefined)
     })
 
     it('enforce records an error on a real WRONGTYPE', async () => {
@@ -414,6 +448,11 @@ describe('redis-backed rate limits', () => {
       const { rc } = await hook(plugin, 'rate_rcpt', c, [
         new Address('<victim@y.com>'),
       ])
+      assert.equal(rc, undefined)
+    })
+
+    it('rate_rcpt passes (no throw) when the recipient is missing', async () => {
+      const { rc } = await hook(plugin, 'rate_rcpt', c, [null])
       assert.equal(rc, undefined)
     })
   })

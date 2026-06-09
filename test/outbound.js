@@ -103,6 +103,26 @@ describe('outbound', () => {
       })
       assert.equal(rc, undefined)
     })
+
+    it('is safe when hmail is null', async () => {
+      const { rc } = await hook(plugin, 'outbound_decrement', null)
+      assert.equal(rc, undefined)
+    })
+
+    it('swallows a redis error (fault injection)', async () => {
+      const orig = plugin.db.hIncrBy
+      plugin.db.hIncrBy = async () => {
+        throw new Error('decr boom')
+      }
+      try {
+        const { rc } = await hook(plugin, 'outbound_decrement', {
+          domain: 'test.com',
+        })
+        assert.equal(rc, undefined)
+      } finally {
+        plugin.db.hIncrBy = orig
+      }
+    })
   })
 
   describe('rate_outbound', () => {
