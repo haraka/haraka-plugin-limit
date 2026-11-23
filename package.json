@@ -13,7 +13,7 @@
   },
   "devDependencies": {
     "@haraka/email-address": "^3.1.5",
-    "@haraka/eslint-config": "^3.0.0",
+    "@haraka/eslint-config": "^3.0.1",
     "haraka-test-fixtures": "^1.7.0"
   },
   "scripts": {
