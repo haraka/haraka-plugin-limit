@@ -112,6 +112,18 @@ exports.shutdown = function () {
 exports.max_unrecognized_commands = function (next, connection, cmd) {
   if (!this.cfg.unrecognized_commands) return next()
 
+  // in case limit is in config/plugins before the AUTH plugin(s)
+  if (connection.notes.authenticating) return next()
+
+  if (Array.isArray(cmd) && /^auth$/i.test(cmd[0])) {
+    const method = cmd[1].split(/\s+/)[0]
+    // auth_base sets notes.authenticating only after it accepts this first line
+    if (connection.notes.allowed_auth_methods?.includes(method.toUpperCase()))
+      return next()
+    // drop the initial response, it holds the credentials
+    cmd = [cmd[0], method]
+  }
+
   connection.results.push(this, { unrec_cmds: cmd, emit: true })
 
   const max = parseFloat(this.cfg.unrecognized_commands.max)
