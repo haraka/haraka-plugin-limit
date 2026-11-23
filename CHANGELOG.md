@@ -6,8 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### [1.3.3] - 2026-11-23
 
-- fix(unrecognized_commands): don't record AUTH credentials
+- fix(unrecognized_commands): don't record AUTH credentials (#81)
 - test(config): handle haraka-config 1.7+ null-prototype objects
+- deps: bump all versions
 
 ### [1.3.2] - 2026-06-09
 
