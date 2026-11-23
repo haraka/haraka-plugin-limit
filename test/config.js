@@ -34,12 +34,13 @@ describe('plugin_setup', () => {
     // gotta inherit b/c config loader merges in defaults from redis.ini
     plugin.inherits('haraka-plugin-redis')
     plugin.load_limit_ini()
-    assert.deepEqual(plugin.cfg, default_config) // loaded config
+    // haraka-config >= 1.7 returns null-prototype objects, which strict deepEqual rejects
+    assert.deepEqual(structuredClone(plugin.cfg), default_config) // loaded config
   })
 
   it('registers', () => {
     plugin.register()
-    assert.deepEqual(plugin.cfg, default_config)
+    assert.deepEqual(structuredClone(plugin.cfg), default_config)
   })
 
   it('registers every hook when all features are enabled', () => {
