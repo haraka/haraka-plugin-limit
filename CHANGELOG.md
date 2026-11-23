@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Unreleased
 
+- fix(unrecognized_commands): don't record AUTH credentials
+
 ### [1.3.2] - 2026-06-09
 
 - fix(rate_conn): honor sub-minute windows; compute the period on timestamps

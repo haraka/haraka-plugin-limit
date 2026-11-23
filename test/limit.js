@@ -60,6 +60,49 @@ for (const { hook: name, over, rc, msg } of denyHooks) {
   })
 }
 
+describe('max_unrecognized_commands recording', () => {
+  // base64 of "\0user\0secret", an AUTH PLAIN initial response
+  const creds = 'AHVzZXIAc2VjcmV0'
+  let plugin, c
+  beforeEach(() => {
+    plugin = configured()
+    plugin.cfg.unrecognized_commands = { max: 5 }
+    c = conn()
+  })
+
+  const recorded = () => c.results.get(plugin)?.unrec_cmds
+
+  it('records other commands as sent', async () => {
+    await hook(plugin, 'max_unrecognized_commands', c, ['XYZZY', 'foo bar'])
+    assert.deepEqual(recorded(), ['XYZZY', 'foo bar'])
+  })
+
+  it('records an AUTH that was not offered without its credentials', async () => {
+    await hook(plugin, 'max_unrecognized_commands', c, [
+      'AUTH',
+      `PLAIN ${creds}`,
+    ])
+    assert.deepEqual(recorded(), ['AUTH', 'PLAIN'])
+  })
+
+  it('skips an AUTH the auth plugin accepts', async () => {
+    c.notes.allowed_auth_methods = ['PLAIN', 'LOGIN']
+    const r = await hook(plugin, 'max_unrecognized_commands', c, [
+      'auth',
+      `plain ${creds}`,
+    ])
+    assert.equal(r.rc, undefined)
+    assert.equal(recorded(), undefined)
+  })
+
+  it('skips the lines of an AUTH in progress', async () => {
+    c.notes.authenticating = true
+    const r = await hook(plugin, 'max_unrecognized_commands', c, [creds])
+    assert.equal(r.rc, undefined)
+    assert.equal(recorded(), undefined)
+  })
+})
+
 describe('check_concurrency', () => {
   let plugin, c
   beforeEach(() => {
